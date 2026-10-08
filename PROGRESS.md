@@ -3,9 +3,10 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Where we are
-- **DESIGN Phase 1 is complete: all 4 increments (plus 2b) are built, reviewed, committed and pushed.** The DESIGN Phase 1 acceptance test passes, both automated and by hand in the browser. **It is waiting for the developer's review at the phase gate.** Nothing from DESIGN Phase 2 has been started.
-- Branch: `phase1-skeleton` (pushed after every increment, at the developer's standing request). It is **not merged into `main`**. Merging is a question for the developer (see Open items).
-- Next, after developer approval: plan **DESIGN Phase 2** (node types and styling: an inspector panel, a type editor, edge types chosen when connecting). Under the global workflow, that starts with a plan and confirmation before any code.
+- **DESIGN Phase 1: complete.** The developer approved it at the gate and confirmed rename works. Branch `phase1-skeleton` is pushed, and the **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed on this machine and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
+- React Testing Library + jsdom were added (developer-approved), with component tests for EditableText and ErrorBanner, on `phase1-skeleton`.
+- **DESIGN Phase 2: planned, not started.** The plan is `docs/PLAN-phase2.md` on branch `phase2` (based on `phase1-skeleton`). **It is waiting for the developer to approve the plan, decisions D1–D12 and questions Q1–Q2.** It includes the developer's request for edges in any direction and radial trees (P2-1, plus roadmap §5 for Phases 3–4).
+- Next: once approved, build P2-0 (the inspector skeleton) on `phase2`.
 
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
@@ -36,8 +37,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
-- **[QUESTION]** Should `phase1-skeleton` be merged into `main` (or a PR opened) now that DESIGN Phase 1 is done?
-- **[DECISION]** Should React Testing Library + jsdom be added (dev dependencies) so UI components such as `EditableText` get automated tests? Today their behavior is verified by hand only.
+- Resolved: a PR for `phase1-skeleton` → `main` was requested (the developer opens it, see above). RTL + jsdom were added.
+- Phase 2 decisions and questions: see `docs/PLAN-phase2.md` §4 and §7.
 - **[ASSUMPTION]** Rename applies to every `text` field shown on the card, not just "title" (data-driven, per CLAUDE.md). An empty value is allowed.
 - **[ASSUMPTION]** "Unsaved changes" compares document objects, not content. Changing a value and then changing it back still counts as unsaved.
 - **[ASSUMPTION]** Load rules (optional keys and defaults, duplicate and S7 rejection, field rules): see PLAN §1, "Load rules".
