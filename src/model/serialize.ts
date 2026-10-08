@@ -1,4 +1,6 @@
-import { CURRENT_SCHEMA_VERSION, type GraphDocument } from './types'
+import { isFiniteNumber, isPlainObject } from './guards'
+import { migrate } from './migrations'
+import type { GraphDocument } from './types'
 
 export type ParseResult = { ok: true; doc: GraphDocument } | { ok: false; error: string }
 
@@ -7,9 +9,9 @@ export function serialize(doc: GraphDocument): string {
 }
 
 /**
- * Parses a saved document.
- * Skeleton version: checks JSON syntax, version and top-level shape only.
- * Full validation, migrations and unknown-key handling come in increment 3.
+ * Parses a saved document, upgrading older schema versions first.
+ * Checks JSON syntax, version and top-level shape; full validation and unknown-key handling come
+ * in increment 3.
  */
 export function parseDocument(text: string): ParseResult {
   let raw: unknown
@@ -22,11 +24,10 @@ export function parseDocument(text: string): ParseResult {
   if (!isPlainObject(raw)) {
     return { ok: false, error: 'File does not contain a graph document object.' }
   }
-  const obj = raw as Record<string, unknown>
+  const migrated = migrate(raw)
+  if (!migrated.ok) return migrated
+  const obj = migrated.doc
 
-  if (obj.schemaVersion !== CURRENT_SCHEMA_VERSION) {
-    return { ok: false, error: `Unsupported schemaVersion: ${String(obj.schemaVersion)}` }
-  }
   for (const key of ['nodeTypes', 'edgeTypes', 'nodes', 'edges'] as const) {
     if (!Array.isArray(obj[key])) return { ok: false, error: `Missing or invalid "${key}" array.` }
   }
@@ -43,12 +44,4 @@ export function parseDocument(text: string): ParseResult {
 
   // Node/edge/type contents are not checked yet; increment 3 adds the full validator.
   return { ok: true, doc: obj as unknown as GraphDocument }
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

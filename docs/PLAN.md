@@ -6,13 +6,13 @@
 
 **Done when (DESIGN §5):** build a 5-node graph, save it, reload the app, load the file, and see the identical graph.
 
-## 1. Graph JSON schema (schemaVersion 1) — approved
+## 1. Graph JSON schema (schemaVersion 2) — approved
 
-Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHandle`.
+Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHandle`, and edge-type styles have `path` (added in v2, increment 2b).
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "meta": { "name": "Untitled", "created": "ISO-8601", "modified": "ISO-8601" },
   "nodeTypes": [
     {
@@ -41,7 +41,7 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
       "id": "prereq",
       "name": "Prerequisite",
       "semantics": "prerequisite",
-      "style": { "stroke": "#94a3b8", "width": 2, "dash": null, "arrow": "end" },
+      "style": { "stroke": "#94a3b8", "width": 2, "dash": null, "arrow": "end", "path": "bezier" },
     },
   ],
   "nodes": [
@@ -77,6 +77,7 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
 - **S8.** Deleting a node deletes its edges.
 - **S9.** `meta.modified` is set when you save. The viewport is saved.
 - **S10.** Stable key order, 2-space indentation.
+- **S11 (v2).** `edgeTypes[].style.path` is one of `bezier | smoothstep | step | straight`; it sets the line shape for every edge of that type. A v1→v2 migration adds `"path": "bezier"`. Older files are upgraded on load through the migration chain in `src/model/migrations.ts`. Editing it in-app comes with DESIGN Phase 2's type editor.
 
 ## 2. Architecture decisions — approved
 
@@ -104,7 +105,8 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
 
 1. Move and delete nodes (with edge cascade, S8). Background, Controls and MiniMap. Save and restore the viewport (S9).
 2. Connect and delete edges (S2, S7). Arrow style comes from the edge type.
-3. Hardened load: the full validator, an error banner, S5, S6, the migration hook, S10, and a 5-node byte-identical round-trip test.
+   - 2b. Edge line shape per edge type (S11): schema v2, the v1→v2 migration, and the migration chain (pulled forward from increment 3).
+3. Hardened load: the full validator (including allowed `path` values), an error banner, S5, S6 (applied to migrated input), S10, and a 5-node byte-identical round-trip test.
 4. Inline title rename (A1) and a New document action. Then the DESIGN Phase 1 acceptance test.
 
 ## 4. Verification

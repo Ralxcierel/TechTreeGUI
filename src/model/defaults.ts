@@ -19,7 +19,7 @@ export function defaultEdgeType(): EdgeType {
     id: DEFAULT_EDGE_TYPE_ID,
     name: 'Prerequisite',
     semantics: 'prerequisite',
-    style: { stroke: '#94a3b8', width: 2, dash: null, arrow: 'end' },
+    style: { stroke: '#94a3b8', width: 2, dash: null, arrow: 'end', path: 'bezier' },
   }
 }
 

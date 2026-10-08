@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
 import { addNode, setViewport } from './operations'
 import { parseDocument, serialize } from './serialize'
-import type { GraphDocument } from './types'
+import { CURRENT_SCHEMA_VERSION, type GraphDocument } from './types'
 
 describe('serialize / parseDocument', () => {
   it('round-trips a document unchanged', () => {
@@ -19,13 +19,45 @@ describe('serialize / parseDocument', () => {
     expect(serialize(result.doc)).toBe(text)
   })
 
+  it('loads a v1 file by migrating it to the current version', () => {
+    const v1 = {
+      schemaVersion: 1,
+      meta: {
+        name: 'Old',
+        created: '2026-01-01T00:00:00.000Z',
+        modified: '2026-01-01T00:00:00.000Z',
+      },
+      nodeTypes: [],
+      edgeTypes: [
+        {
+          id: 'prereq',
+          name: 'Prerequisite',
+          semantics: 'prerequisite',
+          style: { stroke: '#94a3b8', width: 2, dash: null, arrow: 'end' },
+        },
+      ],
+      nodes: [],
+      edges: [],
+      view: { viewport: { x: 0, y: 0, zoom: 1 } },
+    }
+    const result = parseDocument(JSON.stringify(v1))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result.doc.edgeTypes[0]?.style.path).toBe('bezier')
+    // the migrated document round-trips like any current one
+    expect(parseDocument(serialize(result.doc))).toEqual({ ok: true, doc: result.doc })
+  })
+
   it('rejects invalid JSON', () => {
     expect(parseDocument('{nope')).toMatchObject({ ok: false })
   })
 
   it('rejects an unsupported schemaVersion', () => {
     const text = JSON.stringify({ ...createEmptyDocument(), schemaVersion: 99 })
-    expect(parseDocument(text)).toEqual({ ok: false, error: 'Unsupported schemaVersion: 99' })
+    const result = parseDocument(text)
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.error).toMatch(/schemaVersion 99.*newer/)
   })
 
   it('rejects a meta that is an array', () => {

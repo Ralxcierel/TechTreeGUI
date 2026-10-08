@@ -194,6 +194,7 @@ describe('toFlowEdges', () => {
       sourceHandle: null,
       targetHandle: null,
       selected: true,
+      type: 'default',
       style: { stroke: SELECTED_EDGE_COLOR, strokeWidth: 2, strokeDasharray: undefined },
       markerEnd: { type: MarkerType.ArrowClosed, color: SELECTED_EDGE_COLOR },
     })
@@ -221,6 +222,24 @@ describe('toFlowEdges', () => {
     const [start] = toFlowEdges(edges, [type('start')], new Set())
     expect(start?.markerStart).toBeDefined()
     expect(start?.markerEnd).toBeUndefined()
+  })
+
+  it('maps each line shape to a React Flow edge type', () => {
+    const base = defaultEdgeType()
+    const shapes = ['bezier', 'smoothstep', 'step', 'straight'] as const
+    const flowTypes = shapes.map((path) => {
+      const type: EdgeType = { ...base, style: { ...base.style, path } }
+      return toFlowEdges(edges, [type], new Set())[0]?.type
+    })
+    expect(flowTypes).toEqual(['default', 'smoothstep', 'step', 'straight'])
+  })
+
+  it('falls back to the curve for an unknown or inherited-property path', () => {
+    const base = defaultEdgeType()
+    for (const path of ['curvy', 'toString']) {
+      const type = { ...base, style: { ...base.style, path } } as unknown as EdgeType
+      expect(toFlowEdges(edges, [type], new Set())[0]?.type).toBe('default')
+    }
   })
 
   it('renders an edge with an unknown type unstyled instead of failing', () => {

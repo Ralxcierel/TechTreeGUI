@@ -4,6 +4,7 @@ import {
   deleteEdges,
   deleteNodes,
   moveNodes,
+  type EdgePath,
   type EdgeType,
   type GraphDocument,
   type GraphEdge,
@@ -84,6 +85,14 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
   })
 }
 
+/** React Flow's built-in edge component for each line shape. */
+const FLOW_EDGE_TYPE = new Map<EdgePath, 'default' | 'smoothstep' | 'step' | 'straight'>([
+  ['bezier', 'default'],
+  ['smoothstep', 'smoothstep'],
+  ['step', 'step'],
+  ['straight', 'straight'],
+])
+
 /** Builds React Flow edges, styled from each edge's type. */
 export function toFlowEdges(
   edges: readonly GraphEdge[],
@@ -107,6 +116,8 @@ export function toFlowEdges(
     // Selection recolours the line and its arrowheads; markers can't be restyled from CSS.
     const color = selected ? SELECTED_EDGE_COLOR : style.stroke
     const marker = { type: MarkerType.ArrowClosed, color }
+    // A Map lookup, so a bad value from a file (even "toString") falls back to the curve.
+    flowEdge.type = FLOW_EDGE_TYPE.get(style.path) ?? 'default'
     flowEdge.style = {
       stroke: color,
       strokeWidth: style.width,
