@@ -58,4 +58,76 @@ describe('editor store', () => {
     expect(ui.selectedNodeIds.size).toBe(0)
     expect(flowNodes.map((n) => [n.id, n.selected])).toEqual([['n_x', false]])
   })
+
+  it('connects two nodes with the default edge type and rejects invalid connections', () => {
+    const { addNode: add } = store.getState()
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 100 })
+    const [a, b] = store.getState().doc.nodes.map((n) => n.id) as [string, string]
+    const conn = { source: a, target: b, sourceHandle: null, targetHandle: null }
+
+    expect(store.getState().isValidConnection(conn)).toBe(true)
+    store.getState().connect(conn)
+    expect(store.getState().doc.edges).toMatchObject([{ source: a, target: b, typeId: 'prereq' }])
+
+    // duplicate and self-loop are refused and leave state untouched
+    const before = store.getState()
+    expect(before.isValidConnection(conn)).toBe(false)
+    expect(before.isValidConnection({ ...conn, target: a })).toBe(false)
+    before.connect(conn)
+    expect(store.getState()).toBe(before)
+  })
+
+  it('selects and deletes edges through onEdgesChange; load clears edge selection', () => {
+    const { addNode: add } = store.getState()
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 100 })
+    const [a, b] = store.getState().doc.nodes.map((n) => n.id) as [string, string]
+    store.getState().connect({ source: a, target: b, sourceHandle: null, targetHandle: null })
+    const edgeId = store.getState().doc.edges[0]!.id
+
+    store.getState().onEdgesChange([{ id: edgeId, type: 'select', selected: true }])
+    expect(store.getState().ui.selectedEdgeIds.has(edgeId)).toBe(true)
+
+    store.getState().loadDocument(store.getState().doc)
+    expect(store.getState().ui.selectedEdgeIds.size).toBe(0)
+
+    store.getState().onEdgesChange([{ id: edgeId, type: 'remove' }])
+    expect(store.getState().doc.edges).toEqual([])
+  })
+
+  it('handles React Flow keyboard delete order: edge removals, then node removals', () => {
+    const { addNode: add } = store.getState()
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 100 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 200 })
+    const [a, b, c] = store.getState().doc.nodes.map((n) => n.id) as [string, string, string]
+    const link = (source: string, target: string) =>
+      store.getState().connect({ source, target, sourceHandle: null, targetHandle: null })
+    link(a, b)
+    link(b, c)
+    const [ab, bc] = store.getState().doc.edges.map((e) => e.id) as [string, string]
+    store.getState().onEdgesChange([{ id: ab, type: 'select', selected: true }])
+
+    // Deleting node b: React Flow first removes its attached edges, then the node.
+    store.getState().onEdgesChange([
+      { id: ab, type: 'remove' },
+      { id: bc, type: 'remove' },
+    ])
+    store.getState().onNodesChange([{ id: b, type: 'remove' }])
+
+    const { doc, ui } = store.getState()
+    expect(doc.nodes.map((n) => n.id)).toEqual([a, c])
+    expect(doc.edges).toEqual([])
+    expect(ui.selectedEdgeIds.size).toBe(0)
+  })
+
+  it('isValidConnection accepts an Edge-shaped object with undefined handles', () => {
+    const { addNode: add } = store.getState()
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 100 })
+    const [a, b] = store.getState().doc.nodes.map((n) => n.id) as [string, string]
+    expect(store.getState().isValidConnection({ id: 'tmp', source: a, target: b })).toBe(true)
+    expect(store.getState().isValidConnection({ id: 'tmp', source: a, target: a })).toBe(false)
+  })
 })

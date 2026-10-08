@@ -1,18 +1,23 @@
 // The editor store: the single source of truth for the open document.
 // Components read slices of it with `useEditorStore(selector)` and change it only through actions.
-import type { NodeChange } from '@xyflow/react'
+import type { Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react'
 import { create } from 'zustand'
 import {
   addNode,
+  connect,
+  connectionError,
   createEmptyDocument,
+  DEFAULT_EDGE_TYPE_ID,
   setViewport,
   withModified,
+  type EdgeEnds,
   type GraphDocument,
   type Position,
   type Viewport,
 } from '../model'
 import {
   emptyUi,
+  reduceEdgeChanges,
   reduceNodeChanges,
   toFlowNodes,
   uiForLoadedDocument,
@@ -27,6 +32,11 @@ interface EditorState {
   flowNodes: FlowNode[]
   addNode: (typeId: string, position: Position) => void
   onNodesChange: (changes: NodeChange[]) => void
+  onEdgesChange: (changes: EdgeChange[]) => void
+  /** Whether a dragged connection may become an edge of the default type (shown live by React Flow). */
+  isValidConnection: (connection: Connection | Edge) => boolean
+  /** Creates an edge of the default type; invalid connections are ignored. */
+  connect: (connection: Connection) => void
   loadDocument: (doc: GraphDocument) => void
   /** Records the current viewport, stamps `meta.modified`, and returns the document to write. */
   markSaved: (viewport: Viewport) => GraphDocument
@@ -42,6 +52,11 @@ function derive(
   return { doc, ui, flowNodes: toFlowNodes(doc, ui, prev.flowNodes) }
 }
 
+function toEnds(c: Connection | Edge): EdgeEnds {
+  const { source, target, sourceHandle, targetHandle } = c
+  return { source, target, sourceHandle, targetHandle, typeId: DEFAULT_EDGE_TYPE_ID }
+}
+
 const initialDoc = createEmptyDocument()
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
@@ -53,6 +68,17 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     set((s) => {
       const next = reduceNodeChanges(s.doc, s.ui, changes)
       return derive(s, next.doc, next.ui)
+    }),
+  onEdgesChange: (changes) =>
+    set((s) => {
+      const next = reduceEdgeChanges(s.doc, s.ui, changes)
+      return derive(s, next.doc, next.ui)
+    }),
+  isValidConnection: (connection) => connectionError(get().doc, toEnds(connection)) === null,
+  connect: (connection) =>
+    set((s) => {
+      const result = connect(s.doc, toEnds(connection))
+      return result.ok ? derive(s, result.doc, s.ui) : s
     }),
   loadDocument: (doc) =>
     set((s) => {

@@ -1,10 +1,20 @@
-import type { NodeChange } from '@xyflow/react'
+import { MarkerType, type NodeChange } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
-import { addNode, createEmptyDocument, DEFAULT_NODE_TYPE_ID, type GraphDocument } from '../model'
+import {
+  addNode,
+  createEmptyDocument,
+  defaultEdgeType,
+  DEFAULT_NODE_TYPE_ID,
+  type EdgeType,
+  type GraphDocument,
+} from '../model'
 import {
   emptyUi,
   paneCenter,
+  reduceEdgeChanges,
   reduceNodeChanges,
+  SELECTED_EDGE_COLOR,
+  toFlowEdges,
   toFlowNodes,
   uiForLoadedDocument,
 } from './flowAdapter'
@@ -58,6 +68,7 @@ describe('toFlowNodes', () => {
 
   it('passes selection and measured size through', () => {
     const ui = {
+      ...emptyUi(),
       selectedNodeIds: new Set(['a']),
       measured: new Map([['a', { width: 220, height: 40 }]]),
     }
@@ -97,6 +108,7 @@ describe('reduceNodeChanges', () => {
 
   it('returns the same UI state when nothing changed', () => {
     const ui = {
+      ...emptyUi(),
       selectedNodeIds: new Set(['a']),
       measured: new Map([['a', { width: 1, height: 2 }]]),
     }
@@ -131,6 +143,7 @@ describe('reduceNodeChanges', () => {
 
   it('removes nodes, their edges, and their UI state', () => {
     const ui = {
+      ...emptyUi(),
       selectedNodeIds: new Set(['a']),
       measured: new Map([['a', { width: 1, height: 2 }]]),
     }
@@ -145,6 +158,7 @@ describe('reduceNodeChanges', () => {
 describe('uiForLoadedDocument', () => {
   it('clears selection and keeps sizes only for nodes that still exist', () => {
     const prev = {
+      ...emptyUi(),
       selectedNodeIds: new Set(['a']),
       measured: new Map([
         ['a', { width: 1, height: 2 }],
@@ -158,12 +172,106 @@ describe('uiForLoadedDocument', () => {
 
   it('drops the size when the node id now has a different type', () => {
     const prev = {
+      ...emptyUi(),
       selectedNodeIds: new Set<string>(),
       measured: new Map([['a', { width: 1, height: 2 }]]),
     }
     const loaded = twoNodes()
     const retyped = { ...loaded, nodes: loaded.nodes.map((n) => ({ ...n, typeId: 'other' })) }
     expect(uiForLoadedDocument(retyped, twoNodes(), prev).measured.size).toBe(0)
+  })
+})
+
+describe('toFlowEdges', () => {
+  const edges = twoNodes().edges
+
+  it('styles edges from their type and marks selection', () => {
+    const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set(['ab']))
+    expect(edge).toEqual({
+      id: 'ab',
+      source: 'a',
+      target: 'b',
+      sourceHandle: null,
+      targetHandle: null,
+      selected: true,
+      style: { stroke: SELECTED_EDGE_COLOR, strokeWidth: 2, strokeDasharray: undefined },
+      markerEnd: { type: MarkerType.ArrowClosed, color: SELECTED_EDGE_COLOR },
+    })
+  })
+
+  it('uses the type colour when not selected', () => {
+    const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set())
+    expect(edge?.style?.stroke).toBe('#94a3b8')
+    expect(edge?.markerEnd).toEqual({ type: MarkerType.ArrowClosed, color: '#94a3b8' })
+  })
+
+  it('maps dash and arrow placement', () => {
+    const base = defaultEdgeType()
+    const type = (arrow: EdgeType['style']['arrow']): EdgeType => ({
+      ...base,
+      style: { ...base.style, dash: '6 4', arrow },
+    })
+    const [both] = toFlowEdges(edges, [type('both')], new Set())
+    expect(both?.style?.strokeDasharray).toBe('6 4')
+    expect(both?.markerStart).toBeDefined()
+    expect(both?.markerEnd).toBeDefined()
+    const [none] = toFlowEdges(edges, [type('none')], new Set())
+    expect(none?.markerStart).toBeUndefined()
+    expect(none?.markerEnd).toBeUndefined()
+    const [start] = toFlowEdges(edges, [type('start')], new Set())
+    expect(start?.markerStart).toBeDefined()
+    expect(start?.markerEnd).toBeUndefined()
+  })
+
+  it('renders an edge with an unknown type unstyled instead of failing', () => {
+    const [edge] = toFlowEdges(edges, [], new Set())
+    expect(edge).toMatchObject({ id: 'ab', selected: false })
+    expect(edge?.style).toBeUndefined()
+  })
+})
+
+describe('reduceEdgeChanges', () => {
+  it('tracks edge selection in UI state only', () => {
+    const doc = twoNodes()
+    const next = reduceEdgeChanges(doc, emptyUi(), [{ id: 'ab', type: 'select', selected: true }])
+    expect(next.doc).toBe(doc)
+    expect([...next.ui.selectedEdgeIds]).toEqual(['ab'])
+  })
+
+  it('removes edges and their selection, keeping nodes', () => {
+    const doc = twoNodes()
+    const ui = { ...emptyUi(), selectedEdgeIds: new Set(['ab']) }
+    const next = reduceEdgeChanges(doc, ui, [{ id: 'ab', type: 'remove' }])
+    expect(next.doc.edges).toEqual([])
+    expect(next.doc.nodes).toBe(doc.nodes)
+    expect(next.ui.selectedEdgeIds.size).toBe(0)
+  })
+
+  it('returns the same objects for no-op changes and unknown ids', () => {
+    const doc = twoNodes()
+    const ui = emptyUi()
+    const next = reduceEdgeChanges(doc, ui, [
+      { id: 'ab', type: 'select', selected: false },
+      { id: 'zz', type: 'remove' },
+    ])
+    expect(next.doc).toBe(doc)
+    expect(next.ui).toBe(ui)
+  })
+
+  it('keeps the same UI when removed edges were not selected', () => {
+    const doc = twoNodes()
+    const other = { ...doc.edges[0]!, id: 'other', source: 'b', target: 'a' }
+    const withOther = { ...doc, edges: [...doc.edges, other] }
+    const ui = { ...emptyUi(), selectedEdgeIds: new Set(['other']) }
+    const next = reduceEdgeChanges(withOther, ui, [{ id: 'ab', type: 'remove' }])
+    expect(next.doc.edges.map((e) => e.id)).toEqual(['other'])
+    expect(next.ui).toBe(ui)
+  })
+
+  it('node removal also drops selection of cascaded edges', () => {
+    const ui = { ...emptyUi(), selectedEdgeIds: new Set(['ab']) }
+    const next = reduceNodeChanges(twoNodes(), ui, [{ id: 'a', type: 'remove' }])
+    expect(next.ui.selectedEdgeIds.size).toBe(0)
   })
 })
 
