@@ -23,8 +23,10 @@ Current status: **`PROGRESS.md`**.
 ```bash
 npm install        # install dependencies
 npm run dev        # start dev server
-npm test           # run unit tests
-npm run lint       # lint
+npm test           # run unit tests once
+npm run test:watch # run unit tests in watch mode
+npm run lint       # lint (ESLint)
+npm run format     # format with Prettier (Markdown is excluded)
 npm run build      # production build + type check
 ```
 Keep this list accurate as scripts are added.
@@ -39,7 +41,7 @@ src/
   styles/
 docs/
   DESIGN.md
-tests/          # or colocated *.test.ts files (choose one in Phase 1 and stick to it)
+tests: colocated *.test.ts(x) files next to the code they test (decided in Phase 1)
 ```
 
 ## Conventions

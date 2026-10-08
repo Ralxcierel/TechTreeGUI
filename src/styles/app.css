@@ -1,0 +1,94 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --panel-border: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #38bdf8;
+  --error: #f87171;
+  --radius: 8px;
+
+  color-scheme: dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.toolbar__title {
+  font-weight: 600;
+  margin-right: 12px;
+}
+
+.toolbar button {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  border-color: var(--accent);
+}
+
+.toolbar__error {
+  color: var(--error);
+  margin-left: 12px;
+}
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.graph-node {
+  padding: 10px 14px;
+  border: 2px solid;
+  color: var(--text);
+}
+
+.graph-node--rounded {
+  border-radius: var(--radius);
+}
+
+.graph-node--missing {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.graph-node__field {
+  font-weight: 600;
+}
