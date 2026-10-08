@@ -2,6 +2,15 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
+## Resume here (session ended 2026-10-07, at a clean increment boundary)
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (266 tests at hand-off).
+2. Waiting on the developer:
+   - review and approve **P2-3** at the gate
+   - answer the **[DECISION]** on list values below
+   - open the **Phase 1 PR** (link below)
+3. After approval, start **P2-4 (edge types)**. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
+4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times).
+
 ## Where we are
 - **DESIGN Phase 2, increment P2-3 (full inspector) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-2 were approved.
 - The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12. Q1: the radial roadmap was added to `docs/DESIGN.md` (additions only). Q2: starter types Technology, Era and Note.
@@ -88,6 +97,7 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **[ASSUMPTION]** Side handles are hidden until a node is hovered or selected, or a connection is being dragged.
 - **[ASSUMPTION]** The first card field (if text) is the card's title, with no label. Lists show 3 items + "+N more". Rich text is clipped to 3 lines. Only text fields can be edited on the card (on-card dropdowns are Phase 3).
 - Known: a pill with many lines gets large rounded ends that crowd its text, and edges treat pills as rectangles. Pills are best for short cards.
+- **[DECISION]** (from P2-3, awaiting confirmation) List values must contain only strings. Node values that don't fit just show the warning badge, but a node type's list **default** containing non-strings now makes the file fail to load. This is a tightening of the earlier load rules.
 - **[ASSUMPTION]** Clearing a field (an empty number, "—" in a dropdown, an emptied image) removes the value, so the card shows "—".
 - **[ASSUMPTION]** An override equal to the type's value is kept (it pins the node if the type changes later). Use Reset to follow the type.
 - Known: while you delete characters in a colour box, intermediate valid colours (e.g. `#1234`) are saved, so the card flickers briefly.
