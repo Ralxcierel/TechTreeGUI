@@ -23,8 +23,10 @@ Current status: **`PROGRESS.md`**.
 ```bash
 npm install        # install dependencies
 npm run dev        # start dev server
-npm test           # run unit tests
-npm run lint       # lint
+npm test           # run unit tests once
+npm run test:watch # run unit tests in watch mode
+npm run lint       # lint (ESLint)
+npm run format     # format with Prettier (Markdown is excluded)
 npm run build      # production build + type check
 ```
 Keep this list accurate as scripts are added.
@@ -39,7 +41,7 @@ src/
   styles/
 docs/
   DESIGN.md
-tests/          # or colocated *.test.ts files (choose one in Phase 1 and stick to it)
+tests: colocated *.test.ts(x) files next to the code they test (decided in Phase 1)
 ```
 
 ## Conventions
@@ -49,6 +51,7 @@ tests/          # or colocated *.test.ts files (choose one in Phase 1 and stick 
 - Keep components small; one custom node or edge component per file.
 - No new dependency without stating why and getting confirmation.
 - `npm run build`, `npm test` and `npm run lint` must pass before a phase is called done.
+- Component tests (`*.test.tsx`) use React Testing Library and start with `// @vitest-environment jsdom`, and call `afterEach(cleanup)`. Everything else runs in plain Node.
 
 ## Developer context
 - Solo developer, works across multiple computers. The repo (including PROGRESS.md) is the handoff point.

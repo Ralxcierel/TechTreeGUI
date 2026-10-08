@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "meta": {
+    "name": "Five Node Tree",
+    "created": "2026-10-01T12:00:00.000Z",
+    "modified": "2026-10-02T08:30:00.000Z"
+  },
+  "nodeTypes": [
+    {
+      "id": "technology",
+      "name": "Technology",
+      "style": {
+        "shape": "rounded",
+        "width": 220,
+        "fill": "#1e293b",
+        "border": "#64748b",
+        "icon": null
+      },
+      "fields": [
+        {
+          "key": "title",
+          "label": "Name",
+          "kind": "text",
+          "default": "New Technology",
+          "show": [
+            "card"
+          ]
+        }
+      ]
+    }
+  ],
+  "edgeTypes": [
+    {
+      "id": "prereq",
+      "name": "Prerequisite",
+      "semantics": "prerequisite",
+      "style": {
+        "stroke": "#94a3b8",
+        "width": 2,
+        "dash": null,
+        "arrow": "end",
+        "path": "smoothstep"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n_fire",
+      "typeId": "technology",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "title": "Fire"
+      },
+      "styleOverrides": {}
+    },
+    {
+      "id": "n_pottery",
+      "typeId": "technology",
+      "position": {
+        "x": -150,
+        "y": 160
+      },
+      "data": {
+        "title": "Pottery"
+      },
+      "styleOverrides": {}
+    },
+    {
+      "id": "n_bronze",
+      "typeId": "technology",
+      "position": {
+        "x": 150,
+        "y": 160
+      },
+      "data": {
+        "title": "Bronze Working"
+      },
+      "styleOverrides": {}
+    },
+    {
+      "id": "n_writing",
+      "typeId": "technology",
+      "position": {
+        "x": -150,
+        "y": 320.5
+      },
+      "data": {
+        "title": "Writing"
+      },
+      "styleOverrides": {}
+    },
+    {
+      "id": "n_iron",
+      "typeId": "technology",
+      "position": {
+        "x": 150,
+        "y": 320.5
+      },
+      "data": {
+        "title": "Iron Working"
+      },
+      "styleOverrides": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_fire_pottery",
+      "typeId": "prereq",
+      "source": "n_fire",
+      "target": "n_pottery",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "e_fire_bronze",
+      "typeId": "prereq",
+      "source": "n_fire",
+      "target": "n_bronze",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "e_pottery_writing",
+      "typeId": "prereq",
+      "source": "n_pottery",
+      "target": "n_writing",
+      "sourceHandle": null,
+      "targetHandle": null
+    },
+    {
+      "id": "e_bronze_iron",
+      "typeId": "prereq",
+      "source": "n_bronze",
+      "target": "n_iron",
+      "sourceHandle": null,
+      "targetHandle": null
+    }
+  ],
+  "view": {
+    "viewport": {
+      "x": 400,
+      "y": 120,
+      "zoom": 0.85
+    }
+  }
+}
