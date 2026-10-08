@@ -1,11 +1,20 @@
-import { Background, BackgroundVariant, Controls, MiniMap, ReactFlow } from '@xyflow/react'
+import {
+  Background,
+  BackgroundVariant,
+  ConnectionMode,
+  Controls,
+  MiniMap,
+  ReactFlow,
+} from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
 import { useEditorStore } from '../editor/store'
 import { toFlowEdges, type FlowNode } from '../editor/flowAdapter'
+import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
 
 // Defined outside the component so React Flow sees the same object on every render.
 const nodeTypes = { graph: GraphNode }
+const edgeTypes = { graph: GraphEdge }
 const deleteKeys = ['Delete', 'Backspace']
 
 export function Canvas() {
@@ -32,15 +41,22 @@ export function Canvas() {
     [nodeTypeList],
   )
 
+  // While a connection is being dragged, every node shows its handles (CSS `.canvas--connecting`).
+  const [connecting, setConnecting] = useState(false)
+
   return (
-    <div className="canvas">
+    <div className={connecting ? 'canvas canvas--connecting' : 'canvas'}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionMode={ConnectionMode.Loose}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={() => setConnecting(true)}
+        onConnectEnd={() => setConnecting(false)}
         isValidConnection={isValidConnection}
         deleteKeyCode={deleteKeys}
         defaultViewport={initialViewport}

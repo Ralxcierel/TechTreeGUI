@@ -167,6 +167,19 @@ body,
   color: var(--text);
 }
 
+/* Side handles only show on hovered or selected nodes, and on every node while a connection is
+   being dragged, so four dots per node don't clutter the tree. */
+.react-flow__node .react-flow__handle {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle,
+.canvas--connecting .react-flow__handle {
+  opacity: 1;
+}
+
 /* Selected nodes get an accent outline, so it is clear what the inspector is showing. */
 .react-flow__node.selected .graph-node {
   box-shadow: 0 0 0 2px var(--accent);

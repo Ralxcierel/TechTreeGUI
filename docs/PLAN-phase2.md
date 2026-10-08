@@ -113,7 +113,7 @@ builds on the new edge component, and it unblocks the radial direction you asked
 | Phase | Addition |
 |---|---|
 | **2** | Edges in any direction (P2-1). With these, a radial tree laid out *by hand* already looks right. |
-| **3** | When a node has multiple named handles (DESIGN Phase 3), edges that use handle ids attach to those fixed handles. All other edges keep floating. |
+| **3** | When a node has multiple named handles (DESIGN Phase 3), edges that use handle ids attach to those fixed handles. All other edges keep floating. Note from P2-1: when only one end is fixed, the floating end should aim at that handle rather than at the node's centre (today it aims at the centre). |
 | **4** | **Layout direction** as a document setting: `layout.direction` = `down`, `up`, `left`, `right` or `radial`. This is a schema change, so it means **v3 plus a migration**; existing files become `down`. |
 | **4** | **Radial auto-layout:** root technologies (no prerequisites) go at the centre; several roots sit evenly on a small inner ring. Each prerequisite step outwards is one ring further out. Every branch gets an angular slice proportional to its size, so branches don't collide. The layered directions use a standard layered layout. |
 | **4** | **Tiers / eras as rings** in radial mode (and as lanes in the other modes). Ring guides are drawn on the canvas, and nodes snap to rings. |

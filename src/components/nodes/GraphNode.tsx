@@ -1,8 +1,15 @@
 // The one generic node component. Its look and contents come from the node's type, not from code.
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useEditorStore } from '../../editor/store'
-import type { FlowNode } from '../../editor/flowAdapter'
+import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
 import { EditableText } from './EditableText'
+
+const SIDE_POSITION: Record<string, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+}
 
 export function GraphNode({ id, data }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
@@ -17,8 +24,11 @@ export function GraphNode({ id, data }: NodeProps<FlowNode>) {
       className={`graph-node graph-node--${style.shape}`}
       style={{ width: style.width, background: style.fill, borderColor: style.border }}
     >
-      {/* Handles are the connection points edges attach to: incoming on top, outgoing below. */}
-      <Handle type="target" position={Position.Top} />
+      {/* Connection points on every side. In the canvas's "loose" mode any of them can start or
+          finish a connection; edges then float to whichever side faces the other node. */}
+      {SIDE_HANDLE_IDS.map((side) => (
+        <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
+      ))}
       {cardFields.map((field) => (
         <EditableText
           key={field.key}
@@ -28,7 +38,6 @@ export function GraphNode({ id, data }: NodeProps<FlowNode>) {
           onCommit={(value) => setNodeField(id, field.key, value)}
         />
       ))}
-      <Handle type="source" position={Position.Bottom} />
     </div>
   )
 }

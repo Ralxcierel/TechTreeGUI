@@ -3,10 +3,10 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Where we are
-- **DESIGN Phase 2, increment P2-0 (inspector skeleton) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.**
+- **DESIGN Phase 2, increment P2-1 (edges in any direction) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 was approved.
 - The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12. Q1: the radial roadmap was added to `docs/DESIGN.md` (additions only). Q2: starter types Technology, Era and Note.
 - DESIGN Phase 1 is complete on `phase1-skeleton`. The **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
-- Next: once the developer approves, **P2-1, edges in any direction** (floating edges, handles on all four sides).
+- Next: once the developer approves, **P2-2, cards from types**: every field kind on the card, the shapes rounded/rect/pill/circle (circle: width = height), and style overrides merged.
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -17,6 +17,14 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - **Extra (flagged):** selected nodes get an accent outline, so it's clear what the inspector shows.
   - 159 tests. In the browser with real input: select a node, edit live (Backspace doesn't delete the node), deselect, rename the document, and the save file name follows.
   - Independent review: 1 round, no bugs. Nits applied: read-only display for non-string values, `Untitled.json`, more tests, a label class.
+- **P2-1 edges in any direction:**
+  - `src/editor/floatingEdge.ts` (pure geometry): an edge leaves each node where the line between the node centres crosses its outline (box, or ellipse for `circle`), plus the side used for routing. It handles diagonals, ties, zero-size boxes and coincident centres.
+  - `src/editor/edgePath.ts` (pure): picks a fixed handle or the floating anchor per end, and draws bezier, smoothstep, step (sharp) or straight.
+  - `src/components/edges/GraphEdge.tsx`: the one edge component, used for every edge.
+  - Nodes have handles on all 4 sides (ids top/right/bottom/left), and the canvas uses loose connection mode. Connections drawn from them are stored **floating** (handle ids null). A stored side-handle id means a fixed anchor; any other stored id is treated as floating, so the edge isn't hidden.
+  - Handles show on hovered or selected nodes, and on every node while dragging a connection.
+  - 181 tests. In the browser with real input: a hand-made radial tree with a hub and 6 spokes, three edge types and line shapes, all anchored on the facing sides. A connection drawn from a side handle floats, and dragging a node to the other side of the hub re-anchors its edge.
+  - Independent review: 1 round, no bugs. Nits applied: handles shown during a drag, `boundaryAnchor` made total, pure `edgePath` helper with tests, and a test that connecting two handles of one node is refused. A Phase 3 note was added to the plan.
 
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
@@ -50,6 +58,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - Resolved: a PR for `phase1-skeleton` → `main` was requested (the developer opens it, see above). RTL + jsdom were added.
 - Phase 2 decisions: approved (see `docs/PLAN-phase2.md` §4).
 - **[ASSUMPTION]** Inspector edits apply on every keystroke, not on Enter.
+- **[ASSUMPTION]** Side handles are hidden until a node is hovered or selected, or a connection is being dragged.
+- Known: when two nodes overlap, a floating edge's anchors can cross, so the arrow points the wrong way until the nodes are moved apart.
 - **[ASSUMPTION]** Rename applies to every `text` field shown on the card, not just "title" (data-driven, per CLAUDE.md). An empty value is allowed.
 - **[ASSUMPTION]** "Unsaved changes" compares document objects, not content. Changing a value and then changing it back still counts as unsaved.
 - **[ASSUMPTION]** Load rules (optional keys and defaults, duplicate and S7 rejection, field rules): see PLAN §1, "Load rules".

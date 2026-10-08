@@ -21,6 +21,7 @@ import {
   emptyUi,
   reduceEdgeChanges,
   reduceNodeChanges,
+  SIDE_HANDLE_IDS,
   toFlowNodes,
   uiForLoadedDocument,
   type FlowNode,
@@ -67,9 +68,20 @@ function derive(
   return { doc, ui, flowNodes: toFlowNodes(doc, ui, prev.flowNodes) }
 }
 
+/**
+ * Model ends for a connection drawn on the canvas. The generic side handles only start a drag, so
+ * their ids are dropped and the new edge floats (attaches to the side facing the other node).
+ */
 function toEnds(c: Connection | Edge): EdgeEnds {
-  const { source, target, sourceHandle, targetHandle } = c
-  return { source, target, sourceHandle, targetHandle, typeId: DEFAULT_EDGE_TYPE_ID }
+  const { source, target } = c
+  const keep = (id: string | null | undefined) => (id && !SIDE_HANDLE_IDS.includes(id) ? id : null)
+  return {
+    source,
+    target,
+    sourceHandle: keep(c.sourceHandle),
+    targetHandle: keep(c.targetHandle),
+    typeId: DEFAULT_EDGE_TYPE_ID,
+  }
 }
 
 const initialDoc = createEmptyDocument()
