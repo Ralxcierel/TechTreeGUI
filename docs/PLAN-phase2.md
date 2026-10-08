@@ -1,6 +1,8 @@
 # Plan — DESIGN Phase 2: node types, styling, and edges in any direction
 
-> Status: **proposed, waiting for the developer's approval.** No Phase 2 code exists yet.
+> Status: **approved by the developer (2026-10-07)**, along with D1–D12. Q1: yes (DESIGN.md updated).
+> Q2: new documents ship starter types Technology, Era and Note from a registry
+> (`src/model/starters.ts`) that more can be added to. Progress is tracked in `PROGRESS.md`.
 > Scope source: `docs/DESIGN.md` §5 Phase 2, plus the developer's request (2026-10-07): *tech can flow
 > in any direction, not just top-to-bottom; ideally the tree starts in the centre and branches out
 > radially.* The radial work is spread over Phases 2–4 (see §5).

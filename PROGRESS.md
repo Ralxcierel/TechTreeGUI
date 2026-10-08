@@ -3,10 +3,20 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Where we are
-- **DESIGN Phase 1: complete.** The developer approved it at the gate and confirmed rename works. Branch `phase1-skeleton` is pushed, and the **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed on this machine and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
-- React Testing Library + jsdom were added (developer-approved), with component tests for EditableText and ErrorBanner, on `phase1-skeleton`.
-- **DESIGN Phase 2: planned, not started.** The plan is `docs/PLAN-phase2.md` on branch `phase2` (based on `phase1-skeleton`). **It is waiting for the developer to approve the plan, decisions D1–D12 and questions Q1–Q2.** It includes the developer's request for edges in any direction and radial trees (P2-1, plus roadmap §5 for Phases 3–4).
-- Next: once approved, build P2-0 (the inspector skeleton) on `phase2`.
+- **DESIGN Phase 2, increment P2-0 (inspector skeleton) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.**
+- The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12. Q1: the radial roadmap was added to `docs/DESIGN.md` (additions only). Q2: starter types Technology, Era and Note.
+- DESIGN Phase 1 is complete on `phase1-skeleton`. The **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
+- Next: once the developer approves, **P2-1, edges in any direction** (floating edges, handles on all four sides).
+
+## Done (DESIGN Phase 2 so far)
+- **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
+- **P2-0 inspector skeleton:**
+  - A right-hand panel (`src/components/inspector/`). Nothing selected → rename the document (also the save file name) and see counts. One node → its type name and an input for each text field, updated on every keystroke. Anything else → a summary.
+  - A text field holding a non-string value is shown read-only.
+  - Model `renameDocument`, store `setDocumentName`. An empty name saves as `Untitled.json`.
+  - **Extra (flagged):** selected nodes get an accent outline, so it's clear what the inspector shows.
+  - 159 tests. In the browser with real input: select a node, edit live (Backspace doesn't delete the node), deselect, rename the document, and the save file name follows.
+  - Independent review: 1 round, no bugs. Nits applied: read-only display for non-string values, `Untitled.json`, more tests, a label class.
 
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
@@ -38,7 +48,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 
 ## Open items
 - Resolved: a PR for `phase1-skeleton` → `main` was requested (the developer opens it, see above). RTL + jsdom were added.
-- Phase 2 decisions and questions: see `docs/PLAN-phase2.md` §4 and §7.
+- Phase 2 decisions: approved (see `docs/PLAN-phase2.md` §4).
+- **[ASSUMPTION]** Inspector edits apply on every keystroke, not on Enter.
 - **[ASSUMPTION]** Rename applies to every `text` field shown on the card, not just "title" (data-driven, per CLAUDE.md). An empty value is allowed.
 - **[ASSUMPTION]** "Unsaved changes" compares document objects, not content. Changing a value and then changing it back still counts as unsaved.
 - **[ASSUMPTION]** Load rules (optional keys and defaults, duplicate and S7 rejection, field rules): see PLAN §1, "Load rules".

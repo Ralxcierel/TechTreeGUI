@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
-import { addNode, deleteNodes, moveNodes, setViewport, updateNodeData } from './operations'
+import {
+  addNode,
+  deleteNodes,
+  moveNodes,
+  renameDocument,
+  setViewport,
+  updateNodeData,
+} from './operations'
 import type { GraphDocument } from './types'
 
 describe('addNode', () => {
@@ -143,6 +150,22 @@ describe('updateNodeData', () => {
   it('adds a key that was not set before', () => {
     const next = updateNodeData(docWithChain(), 'a', 'notes', '')
     expect(next.nodes[0]?.data).toEqual({ title: 'New Technology', notes: '' })
+  })
+})
+
+describe('renameDocument', () => {
+  it('changes meta.name, keeping other meta keys', () => {
+    const doc = createEmptyDocument('Old')
+    const next = renameDocument(
+      { ...doc, meta: { ...doc.meta, author: 'me' } as typeof doc.meta },
+      'New',
+    )
+    expect(next.meta).toMatchObject({ name: 'New', author: 'me' })
+  })
+
+  it('returns the same document when the name is unchanged', () => {
+    const doc = createEmptyDocument('Same')
+    expect(renameDocument(doc, 'Same')).toBe(doc)
   })
 })
 

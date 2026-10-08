@@ -138,6 +138,11 @@ export function setViewport(doc: GraphDocument, viewport: Viewport): GraphDocume
   }
 }
 
+/** Renames the document (also used as the save file name). Returns `doc` itself if unchanged. */
+export function renameDocument(doc: GraphDocument, name: string): GraphDocument {
+  return name === doc.meta.name ? doc : { ...doc, meta: { ...doc.meta, name } }
+}
+
 /** Stamps `meta.modified`; called when the document is saved. */
 export function withModified(doc: GraphDocument, now: Date = new Date()): GraphDocument {
   return { ...doc, meta: { ...doc.meta, modified: now.toISOString() } }

@@ -7,6 +7,7 @@ import {
   connect,
   connectionError,
   createEmptyDocument,
+  renameDocument,
   DEFAULT_EDGE_TYPE_ID,
   setViewport,
   updateNodeData,
@@ -45,6 +46,8 @@ interface EditorState {
   connect: (connection: Connection) => void
   /** Sets one value in a node's data, e.g. its title. */
   setNodeField: (nodeId: string, key: string, value: unknown) => void
+  /** Renames the document (also the save file name). */
+  setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
   loadDocument: (doc: GraphDocument) => void
   /** Starts a fresh, empty document. */
@@ -95,6 +98,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }),
   setNodeField: (nodeId, key, value) =>
     set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
+  setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
   loadDocument: (doc) =>
     set((s) => {
       const ui = uiForLoadedDocument(doc, s.doc, s.ui)

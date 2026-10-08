@@ -90,6 +90,8 @@ Each phase must end with a running app and passing tests.
 - A side **inspector panel** edits the selected node's field values.
 - A **type editor** creates and edits node types (name, style, field list) in-app.
 - Edge types with distinct styles, chosen when connecting or in the inspector.
+- **Edges in any direction** (added 2026-10): an edge attaches to whichever side of each node faces the other node, so trees laid out sideways, upwards or radially look right.
+- **Starter types** (added 2026-10): new documents include Technology, Era and Note node types, from a registry that more starter types can be added to later.
 
 ### Phase 3 — Rich node content
 - **Tooltips** on hover, showing fields marked `tooltip`.
@@ -97,12 +99,15 @@ Each phase must end with a running app and passing tests.
 - **Expandable sections**: collapse/expand to show fields marked `expanded`.
 - Icons or images on nodes.
 - Multiple connection handles per node (e.g. inputs left, outputs right).
+- Edges that name a handle attach to that handle; all other edges keep attaching to the facing side (added 2026-10).
 
 ### Phase 4 — Tech-tree features
 - **Tiers / columns** (eras) as visual lanes that nodes snap into.
 - **Validation**: cycle detection on prerequisite edges, plus warnings for unreachable or orphan nodes.
 - **Auto-layout** of prerequisite chains (layered layout, e.g. elkjs or dagre).
 - **Play mode**: simulate unlocking. Nodes show locked, available or unlocked based on prerequisites, with a running total of cost.
+- **Layout direction** (added 2026-10): a document setting, `down`, `up`, `left`, `right` or `radial` (schema change with migration).
+- **Radial trees** (added 2026-10): the tree starts in the centre and branches outward. Root technologies sit at the centre, each prerequisite step is one ring further out, and each branch gets an angular slice sized to fit it. In radial mode, tiers/eras are concentric rings that nodes snap to.
 
 ### Phase 5 — Quality of life
 - Undo/redo.
