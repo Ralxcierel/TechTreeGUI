@@ -51,6 +51,7 @@ tests: colocated *.test.ts(x) files next to the code they test (decided in Phase
 - Keep components small; one custom node or edge component per file.
 - No new dependency without stating why and getting confirmation.
 - `npm run build`, `npm test` and `npm run lint` must pass before a phase is called done.
+- Component tests (`*.test.tsx`) use React Testing Library and start with `// @vitest-environment jsdom`, and call `afterEach(cleanup)`. Everything else runs in plain Node.
 
 ## Developer context
 - Solo developer, works across multiple computers. The repo (including PROGRESS.md) is the handoff point.
