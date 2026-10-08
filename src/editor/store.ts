@@ -9,6 +9,7 @@ import {
   createEmptyDocument,
   DEFAULT_EDGE_TYPE_ID,
   setViewport,
+  updateNodeData,
   withModified,
   type EdgeEnds,
   type GraphDocument,
@@ -27,6 +28,11 @@ import {
 
 interface EditorState {
   doc: GraphDocument
+  /**
+   * The document as last saved, loaded or created; `doc !== savedDoc` means unsaved changes.
+   * This compares objects, not content: editing a value and then changing it back still counts.
+   */
+  savedDoc: GraphDocument
   ui: UiState
   /** React Flow nodes derived from `doc` + `ui`; kept here so unchanged nodes keep their identity. */
   flowNodes: FlowNode[]
@@ -37,7 +43,13 @@ interface EditorState {
   isValidConnection: (connection: Connection | Edge) => boolean
   /** Creates an edge of the default type; invalid connections are ignored. */
   connect: (connection: Connection) => void
+  /** Sets one value in a node's data, e.g. its title. */
+  setNodeField: (nodeId: string, key: string, value: unknown) => void
+  /** Replaces the open document (after Load); it counts as saved. */
   loadDocument: (doc: GraphDocument) => void
+  /** Starts a fresh, empty document. */
+  newDocument: () => void
+  hasUnsavedChanges: () => boolean
   /** Records the current viewport, stamps `meta.modified`, and returns the document to write. */
   markSaved: (viewport: Viewport) => GraphDocument
 }
@@ -61,6 +73,7 @@ const initialDoc = createEmptyDocument()
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
   doc: initialDoc,
+  savedDoc: initialDoc,
   ui: emptyUi(),
   flowNodes: [],
   addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
@@ -80,14 +93,18 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       const result = connect(s.doc, toEnds(connection))
       return result.ok ? derive(s, result.doc, s.ui) : s
     }),
+  setNodeField: (nodeId, key, value) =>
+    set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
   loadDocument: (doc) =>
     set((s) => {
       const ui = uiForLoadedDocument(doc, s.doc, s.ui)
-      return { doc, ui, flowNodes: toFlowNodes(doc, ui) }
+      return { doc, savedDoc: doc, ui, flowNodes: toFlowNodes(doc, ui) }
     }),
+  newDocument: () => get().loadDocument(createEmptyDocument()),
+  hasUnsavedChanges: () => get().doc !== get().savedDoc,
   markSaved: (viewport) => {
     const doc = withModified(setViewport(get().doc, viewport))
-    set((s) => derive(s, doc, s.ui))
+    set((s) => ({ ...derive(s, doc, s.ui), savedDoc: doc }))
     return doc
   },
 }))

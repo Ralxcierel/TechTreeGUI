@@ -41,6 +41,22 @@ export function Toolbar() {
     setError(null)
   }
 
+  /** Asks before throwing away unsaved changes. */
+  const okToDiscard = () =>
+    !useEditorStore.getState().hasUnsavedChanges() ||
+    window.confirm('Discard unsaved changes to the current graph?')
+
+  const handleNew = () => {
+    if (!okToDiscard()) return
+    useEditorStore.getState().newDocument()
+    void setViewport(useEditorStore.getState().doc.view.viewport)
+    setError(null)
+  }
+
+  const handleLoadClick = () => {
+    if (okToDiscard()) fileInput.current?.click()
+  }
+
   const handleFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = '' // allow picking the same file again
@@ -73,9 +89,10 @@ export function Toolbar() {
     <>
       <div className="toolbar">
         <span className="toolbar__title">Node Sandbox</span>
+        <button onClick={handleNew}>New</button>
         <button onClick={handleAdd}>Add node</button>
         <button onClick={handleSave}>Save</button>
-        <button onClick={() => fileInput.current?.click()}>Load</button>
+        <button onClick={handleLoadClick}>Load</button>
         <input
           ref={fileInput}
           type="file"

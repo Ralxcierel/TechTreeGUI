@@ -29,6 +29,33 @@ export function addNode(
   return { ...doc, nodes: [...doc.nodes, node] }
 }
 
+/**
+ * Sets one value in a node's `data` (e.g. its title). Returns `doc` itself if the node doesn't
+ * exist or the value is unchanged. Other data keys, including unknown ones, are kept.
+ */
+export function updateNodeData(
+  doc: GraphDocument,
+  nodeId: string,
+  key: string,
+  value: unknown,
+): GraphDocument {
+  let changed = false
+  const nodes = doc.nodes.map((n) => {
+    if (n.id !== nodeId || (Object.hasOwn(n.data, key) && Object.is(n.data[key], value))) return n
+    changed = true
+    const data = { ...n.data }
+    // defineProperty so a key like "__proto__" stays plain data (see canonical.ts)
+    Object.defineProperty(data, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    })
+    return { ...n, data }
+  })
+  return changed ? { ...doc, nodes } : doc
+}
+
 /** Moves nodes to new positions. Unknown ids are ignored. Returns `doc` itself if nothing moved. */
 export function moveNodes(doc: GraphDocument, moves: ReadonlyMap<string, Position>): GraphDocument {
   let changed = false

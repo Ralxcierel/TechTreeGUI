@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
-import { addNode, deleteNodes, moveNodes, setViewport } from './operations'
+import { addNode, deleteNodes, moveNodes, setViewport, updateNodeData } from './operations'
+import type { GraphDocument } from './types'
 
 describe('addNode', () => {
   it('adds a node with type defaults and does not mutate the input', () => {
@@ -109,6 +110,39 @@ describe('deleteNodes', () => {
   it('returns the same document when no id matches', () => {
     const doc = docWithChain()
     expect(deleteNodes(doc, ['zz'])).toBe(doc)
+  })
+})
+
+describe('updateNodeData', () => {
+  it('sets one data value on one node, keeping other keys', () => {
+    const doc = docWithChain()
+    const withExtra: GraphDocument = {
+      ...doc,
+      nodes: doc.nodes.map((n) => ({ ...n, data: { ...n.data, x: 1 } })),
+    }
+    const next = updateNodeData(withExtra, 'b', 'title', 'Steam Power')
+    expect(next.nodes[1]?.data).toEqual({ title: 'Steam Power', x: 1 })
+    expect(next.nodes[0]).toBe(withExtra.nodes[0])
+    expect(withExtra.nodes[1]?.data.title).toBe('New Technology')
+  })
+
+  it('returns the same document for an unknown node or an unchanged value', () => {
+    const doc = docWithChain()
+    expect(updateNodeData(doc, 'zz', 'title', 'X')).toBe(doc)
+    expect(updateNodeData(doc, 'a', 'title', 'New Technology')).toBe(doc)
+  })
+
+  it('stores a "__proto__" key as plain data', () => {
+    const next = updateNodeData(docWithChain(), 'a', '__proto__', { polluted: true })
+    const data = next.nodes[0]!.data
+    expect(Object.hasOwn(data, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(data)).toBe(Object.prototype)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
+  it('adds a key that was not set before', () => {
+    const next = updateNodeData(docWithChain(), 'a', 'notes', '')
+    expect(next.nodes[0]?.data).toEqual({ title: 'New Technology', notes: '' })
   })
 })
 

@@ -88,7 +88,7 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
 - **D4.** Tests are colocated `*.test.ts(x)` files.
 - **D5.** A hand-written validator (no zod).
 - **D6.** Deferred: Radix (Phase 3). For Phase 2, the proposed style merge is a shallow merge: `{...type.style, ...node.styleOverrides}`.
-- **A1.** Double-click a node title to rename it inline.
+- **A1.** Double-click a node title to rename it inline. Implemented generically: every `text` field shown on the card is editable this way (Enter/blur saves, Escape cancels).
 - **Dependencies (approved):** `@xyflow/react`, `zustand`. Dev: `vitest`, `prettier`, `eslint-config-prettier`, plus the Vite template's ESLint packages.
 
 ## 3. Sequencing

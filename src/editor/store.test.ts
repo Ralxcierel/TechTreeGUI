@@ -8,6 +8,57 @@ beforeEach(() => {
   store.setState(store.getInitialState(), true)
 })
 
+describe('rename, new document and unsaved changes', () => {
+  it('setNodeField renames a node and updates its flow node', () => {
+    store.getState().addNode(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    const id = store.getState().doc.nodes[0]!.id
+    store.getState().setNodeField(id, 'title', 'Steam Power')
+    expect(store.getState().doc.nodes[0]?.data.title).toBe('Steam Power')
+    expect(store.getState().flowNodes[0]?.data.values.title).toBe('Steam Power')
+  })
+
+  it('tracks unsaved changes across edit, save, load and new', () => {
+    const s = () => store.getState()
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    s().addNode(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    expect(s().hasUnsavedChanges()).toBe(true)
+
+    s().markSaved({ x: 0, y: 0, zoom: 1 })
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    // selection alone is not a change
+    const id = s().doc.nodes[0]!.id
+    s().onNodesChange([{ id, type: 'select', selected: true }])
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    // a rename to the same value is not a change
+    s().setNodeField(id, 'title', 'New Technology')
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    s().setNodeField(id, 'title', 'Renamed')
+    expect(s().hasUnsavedChanges()).toBe(true)
+
+    s().loadDocument(createEmptyDocument('Loaded'))
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    // re-loading the open document, or a drag that ends where it started, is not a change
+    s().loadDocument(s().doc)
+    expect(s().hasUnsavedChanges()).toBe(false)
+    s().addNode(DEFAULT_NODE_TYPE_ID, { x: 5, y: 5 })
+    s().markSaved({ x: 0, y: 0, zoom: 1 })
+    const nodeId = s().doc.nodes[0]!.id
+    s().onNodesChange([{ id: nodeId, type: 'position', position: { x: 5, y: 5 } }])
+    expect(s().hasUnsavedChanges()).toBe(false)
+
+    s().addNode(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    s().newDocument()
+    expect(s().doc.nodes).toEqual([])
+    expect(s().doc.meta.name).toBe('Untitled')
+    expect(s().hasUnsavedChanges()).toBe(false)
+  })
+})
+
 describe('editor store', () => {
   it('adds a node and derives its flow node', () => {
     store.getState().addNode(DEFAULT_NODE_TYPE_ID, { x: 1, y: 2 })

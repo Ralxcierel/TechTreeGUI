@@ -2,9 +2,11 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useEditorStore } from '../../editor/store'
 import type { FlowNode } from '../../editor/flowAdapter'
+import { EditableText } from './EditableText'
 
-export function GraphNode({ data }: NodeProps<FlowNode>) {
+export function GraphNode({ id, data }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
+  const setNodeField = useEditorStore((s) => s.setNodeField)
   if (!nodeType) return <div className="graph-node graph-node--missing">Unknown type</div>
 
   const { style } = nodeType
@@ -18,9 +20,13 @@ export function GraphNode({ data }: NodeProps<FlowNode>) {
       {/* Handles are the connection points edges attach to: incoming on top, outgoing below. */}
       <Handle type="target" position={Position.Top} />
       {cardFields.map((field) => (
-        <div key={field.key} className="graph-node__field">
-          {String(data.values[field.key] ?? '')}
-        </div>
+        <EditableText
+          key={field.key}
+          className="graph-node__field"
+          label={field.label}
+          value={String(data.values[field.key] ?? '')}
+          onCommit={(value) => setNodeField(id, field.key, value)}
+        />
       ))}
       <Handle type="source" position={Position.Bottom} />
     </div>
