@@ -4,7 +4,7 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 
 ## Where we are
 - **DESIGN Phase 1, workflow Phase 2:** the walking skeleton is **built and reviewed. It is waiting for the developer's review at the gate.**
-- Branch: `phase1-skeleton` (local, not pushed).
+- Branch: `phase1-skeleton` (pushed to origin).
 - Next: once the developer approves, start **Increment 1** (move and delete nodes, Background/Controls/MiniMap, save and restore the viewport).
 
 ## Done
@@ -19,7 +19,7 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - Independent review: 2 rounds. Round 1 found 1 bug and 2 should-fixes, all fixed; round 2 found no bugs. Details are in the commit message.
 
 ## Open items
-- **[DECISION]** Should `noUncheckedIndexedAccess` be turned on in `tsconfig.app.json`? It's cheaper now than later. Not applied.
+- Resolved: `noUncheckedIndexedAccess` enabled (developer approved).
 - **[ASSUMPTION]** The Vite template now ships oxlint. ESLint (per CLAUDE.md) is used instead, with the classic Vite ESLint packages (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`).
 - **[ASSUMPTION]** Prettier ignores `*.md` so it never reformats DESIGN.md or CLAUDE.md.
 
