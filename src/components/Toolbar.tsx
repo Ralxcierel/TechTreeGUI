@@ -4,6 +4,7 @@ import { useEditorStore } from '../editor/store'
 import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
 import { DEFAULT_NODE_TYPE_ID, parseDocument, serialize } from '../model'
+import { ErrorBanner, type BannerMessage } from './ErrorBanner'
 
 const STACK_OFFSET = 24
 
@@ -11,14 +12,17 @@ export function Toolbar() {
   const flowStore = useStoreApi()
   const { getViewport, setViewport } = useReactFlow()
   const fileInput = useRef<HTMLInputElement>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<BannerMessage | null>(null)
 
   const handleAdd = () => {
     const { width, height, transform } = flowStore.getState()
     const { doc, addNode } = useEditorStore.getState()
     const nodeType = doc.nodeTypes.find((t) => t.id === DEFAULT_NODE_TYPE_ID)
     if (!nodeType) {
-      setError(`This document has no "${DEFAULT_NODE_TYPE_ID}" node type to add.`)
+      setError({
+        title: 'Cannot add a node.',
+        details: [`This document has no "${DEFAULT_NODE_TYPE_ID}" node type.`],
+      })
       return
     }
     const center = paneCenter(width, height, transform)
@@ -45,7 +49,10 @@ export function Toolbar() {
     try {
       text = await file.text()
     } catch (err) {
-      setError(`Could not read ${file.name}: ${err instanceof Error ? err.message : String(err)}`)
+      setError({
+        title: `Could not read ${file.name}.`,
+        details: [err instanceof Error ? err.message : String(err)],
+      })
       return
     }
     const result = parseDocument(text)
@@ -54,28 +61,30 @@ export function Toolbar() {
       void setViewport(result.doc.view.viewport)
       setError(null)
     } else {
-      setError(`Could not load ${file.name}: ${result.error}`)
+      const count = result.errors.length
+      setError({
+        title: `Could not load ${file.name}: ${count} problem${count === 1 ? '' : 's'} found. Nothing was changed.`,
+        details: result.errors,
+      })
     }
   }
 
   return (
-    <div className="toolbar">
-      <span className="toolbar__title">Node Sandbox</span>
-      <button onClick={handleAdd}>Add node</button>
-      <button onClick={handleSave}>Save</button>
-      <button onClick={() => fileInput.current?.click()}>Load</button>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        onChange={handleFile}
-      />
-      {error && (
-        <span className="toolbar__error" role="alert">
-          {error}
-        </span>
-      )}
-    </div>
+    <>
+      <div className="toolbar">
+        <span className="toolbar__title">Node Sandbox</span>
+        <button onClick={handleAdd}>Add node</button>
+        <button onClick={handleSave}>Save</button>
+        <button onClick={() => fileInput.current?.click()}>Load</button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={handleFile}
+        />
+      </div>
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+    </>
   )
 }

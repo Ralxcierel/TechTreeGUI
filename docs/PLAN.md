@@ -78,6 +78,7 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
 - **S9.** `meta.modified` is set when you save. The viewport is saved.
 - **S10.** Stable key order, 2-space indentation.
 - **S11 (v2).** `edgeTypes[].style.path` is one of `bezier | smoothstep | step | straight`; it sets the line shape for every edge of that type. A v1→v2 migration adds `"path": "bezier"`. Older files are upgraded on load through the migration chain in `src/model/migrations.ts`. Editing it in-app comes with DESIGN Phase 2's type editor.
+- **Load rules (increment 3, developer-approved assumptions).** Optional keys and their defaults: edge `sourceHandle`/`targetHandle` → `null`; node `data`/`styleOverrides` → `{}`; node-type `style.icon` → `null`; edge-type `semantics` → `null` and `style.dash` → `null`; `meta.created`/`modified` → load time. Everything else is required. Duplicate ids within a collection, duplicate field keys within a node type, and edges breaking S7 are rejected. Field definitions: `options` (non-empty) is required on `enum` fields and forbidden on others; `default` must suit the kind. `styleOverrides` keys are validated like the node style. Integrity checks run once the shape is valid. Not checked yet: node `data` values against field kinds (DESIGN Phase 2 inspector) and timestamp format.
 
 ## 2. Architecture decisions — approved
 

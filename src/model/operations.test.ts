@@ -28,6 +28,23 @@ describe('addNode', () => {
     expect(a).not.toBe(b)
   })
 
+  it('stores a field keyed "__proto__" as plain data', () => {
+    const doc = createEmptyDocument()
+    const nodeType = doc.nodeTypes[0]!
+    const weird = {
+      ...doc,
+      nodeTypes: [
+        {
+          ...nodeType,
+          fields: [{ key: '__proto__', label: 'P', kind: 'text' as const, default: 'x', show: [] }],
+        },
+      ],
+    }
+    const node = addNode(weird, DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 }).nodes[0]!
+    expect(Object.hasOwn(node.data, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(node.data)).toBe(Object.prototype)
+  })
+
   it('throws on an unknown node type', () => {
     expect(() => addNode(createEmptyDocument(), 'nope', { x: 0, y: 0 })).toThrow(
       /Unknown node type/,

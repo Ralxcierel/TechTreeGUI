@@ -14,7 +14,15 @@ export function addNode(
 
   const data: Record<string, unknown> = {}
   for (const field of nodeType.fields) {
-    if (field.default !== undefined) data[field.key] = field.default
+    // defineProperty, not `data[key] =`, so even a field keyed "__proto__" becomes plain data.
+    if (field.default !== undefined) {
+      Object.defineProperty(data, field.key, {
+        value: field.default,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+    }
   }
 
   const node: GraphNode = { id, typeId, position: { ...position }, data, styleOverrides: {} }
@@ -28,7 +36,7 @@ export function moveNodes(doc: GraphDocument, moves: ReadonlyMap<string, Positio
     const to = moves.get(n.id)
     if (!to || (to.x === n.position.x && to.y === n.position.y)) return n
     changed = true
-    return { ...n, position: { x: to.x, y: to.y } }
+    return { ...n, position: { ...n.position, x: to.x, y: to.y } }
   })
   return changed ? { ...doc, nodes } : doc
 }
@@ -94,7 +102,13 @@ export function deleteEdges(doc: GraphDocument, ids: Iterable<string>): GraphDoc
 }
 
 export function setViewport(doc: GraphDocument, viewport: Viewport): GraphDocument {
-  return { ...doc, view: { ...doc.view, viewport: { ...viewport } } }
+  return {
+    ...doc,
+    view: {
+      ...doc.view,
+      viewport: { ...doc.view.viewport, x: viewport.x, y: viewport.y, zoom: viewport.zoom },
+    },
+  }
 }
 
 /** Stamps `meta.modified`; called when the document is saved. */

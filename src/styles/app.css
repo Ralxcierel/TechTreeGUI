@@ -64,9 +64,37 @@ body,
   border-color: var(--accent);
 }
 
-.toolbar__error {
-  color: var(--error);
-  margin-left: 12px;
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--error) 18%, var(--panel));
+  border-bottom: 1px solid var(--error);
+}
+
+.error-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-banner ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.error-banner__close {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .canvas {
