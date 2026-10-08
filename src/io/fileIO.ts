@@ -4,7 +4,7 @@ export function fileNameFor(docName: string): string {
   // Replace characters that are invalid in Windows/macOS/Linux file names; keep everything else.
   // eslint-disable-next-line no-control-regex
   const safe = docName.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').trim()
-  return `${safe || 'graph'}.json`
+  return `${safe || 'Untitled'}.json`
 }
 
 export function downloadText(fileName: string, text: string): void {

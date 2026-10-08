@@ -8,9 +8,17 @@ interface EditableTextProps {
   className?: string
   /** Accessible name for the input, e.g. the field label. */
   label: string
+  /** Shown (muted) instead of an empty value, so there is something to double-click. */
+  placeholder?: string
 }
 
-export function EditableText({ value, onCommit, className, label }: EditableTextProps) {
+export function EditableText({
+  value,
+  onCommit,
+  className,
+  label,
+  placeholder,
+}: EditableTextProps) {
   // `draft` is null while not editing.
   const [draft, setDraft] = useState<string | null>(null)
   // Set once an edit ends, so a late blur (e.g. after Escape) can't commit it a second time.
@@ -43,7 +51,14 @@ export function EditableText({ value, onCommit, className, label }: EditableText
         title="Double-click to edit"
         onDoubleClick={start}
       >
-        {value || ' '}
+        {/* A blank value (empty or only spaces) would collapse to nothing you can double-click. */}
+        {value.trim() !== '' ? (
+          value
+        ) : placeholder ? (
+          <span className="editable--empty">{placeholder}</span>
+        ) : (
+          '\u00a0'
+        )}
       </div>
     )
   }
@@ -54,6 +69,8 @@ export function EditableText({ value, onCommit, className, label }: EditableText
       className={`${className ?? ''} graph-node__input nodrag nopan`}
       aria-label={label}
       value={draft}
+      // Sized to the text, so an inline "Label: value" editor stays on its line (CSS caps the width).
+      size={Math.max(draft.length, 4) + 1}
       autoFocus
       onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => setDraft(e.target.value)}

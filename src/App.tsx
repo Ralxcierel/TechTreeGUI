@@ -1,5 +1,6 @@
 import { ReactFlowProvider } from '@xyflow/react'
 import { Canvas } from './components/Canvas'
+import { Inspector } from './components/inspector/Inspector'
 import { Toolbar } from './components/Toolbar'
 
 export default function App() {
@@ -8,7 +9,10 @@ export default function App() {
     <ReactFlowProvider>
       <div className="app">
         <Toolbar />
-        <Canvas />
+        <div className="workspace">
+          <Canvas />
+          <Inspector />
+        </div>
       </div>
     </ReactFlowProvider>
   )

@@ -8,13 +8,19 @@ import {
   type EdgeType,
   type GraphDocument,
   type GraphEdge,
+  type NodeStyle,
   type Position,
 } from '../model'
 
 /** Colour of a selected edge and its arrowheads (matches `--accent` in styles/app.css). */
 export const SELECTED_EDGE_COLOR = '#38bdf8'
 
-export type GraphNodeData = { typeId: string; values: Record<string, unknown> }
+export type GraphNodeData = {
+  typeId: string
+  values: Record<string, unknown>
+  /** The node's own style overrides, merged over its type's style when drawn. */
+  overrides: Partial<NodeStyle>
+}
 export type FlowNode = Node<GraphNodeData, 'graph'>
 
 export interface Size {
@@ -68,6 +74,7 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
       old &&
       old.position === n.position &&
       old.data.values === n.data &&
+      old.data.overrides === n.styleOverrides &&
       old.data.typeId === n.typeId &&
       old.selected === selected &&
       old.measured === measured
@@ -78,46 +85,59 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
       id: n.id,
       type: 'graph',
       position: n.position,
-      data: { typeId: n.typeId, values: n.data },
+      data: { typeId: n.typeId, values: n.data, overrides: n.styleOverrides },
       selected,
       measured,
     }
   })
 }
 
-/** React Flow's built-in edge component for each line shape. */
-const FLOW_EDGE_TYPE = new Map<EdgePath, 'default' | 'smoothstep' | 'step' | 'straight'>([
-  ['bezier', 'default'],
-  ['smoothstep', 'smoothstep'],
-  ['step', 'step'],
-  ['straight', 'straight'],
-])
+/**
+ * The connection handles every node has, one per side. Dragging from any of them starts a
+ * connection; the edge it creates floats (stores no handle id). An edge that does store one of these
+ * ids is drawn from that fixed side.
+ */
+export const SIDE_HANDLE_IDS: readonly string[] = ['top', 'right', 'bottom', 'left']
 
-/** Builds React Flow edges, styled from each edge's type. */
+/** Line shapes the edge component can draw. A Set, so a bad value (even "toString") is unknown. */
+const EDGE_PATHS = new Set<EdgePath>(['bezier', 'smoothstep', 'step', 'straight'])
+
+export type GraphEdgeData = { path: EdgePath }
+export type FlowEdge = Edge<GraphEdgeData, 'graph'>
+
+/**
+ * A stored handle id React Flow can actually find on the node, or null (= floating). An unknown id
+ * would make React Flow skip drawing the edge entirely.
+ */
+function knownHandle(id: string | null): string | null {
+  return id !== null && SIDE_HANDLE_IDS.includes(id) ? id : null
+}
+
+/** Builds React Flow edges, drawn by the `graph` edge component and styled from each edge's type. */
 export function toFlowEdges(
   edges: readonly GraphEdge[],
   edgeTypes: readonly EdgeType[],
   selectedEdgeIds: ReadonlySet<string>,
-): Edge[] {
+): FlowEdge[] {
   const typesById = new Map(edgeTypes.map((t) => [t.id, t]))
   return edges.map((e) => {
     const selected = selectedEdgeIds.has(e.id)
-    const flowEdge: Edge = {
+    const style = typesById.get(e.typeId)?.style
+    const flowEdge: FlowEdge = {
       id: e.id,
+      type: 'graph',
       source: e.source,
       target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
+      sourceHandle: knownHandle(e.sourceHandle),
+      targetHandle: knownHandle(e.targetHandle),
       selected,
+      data: { path: style && EDGE_PATHS.has(style.path) ? style.path : 'bezier' },
     }
-    const style = typesById.get(e.typeId)?.style
     if (!style) return flowEdge
 
     // Selection recolours the line and its arrowheads; markers can't be restyled from CSS.
     const color = selected ? SELECTED_EDGE_COLOR : style.stroke
     const marker = { type: MarkerType.ArrowClosed, color }
-    // A Map lookup, so a bad value from a file (even "toString") falls back to the curve.
-    flowEdge.type = FLOW_EDGE_TYPE.get(style.path) ?? 'default'
     flowEdge.style = {
       stroke: color,
       strokeWidth: style.width,

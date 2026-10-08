@@ -173,6 +173,24 @@ describe('editor store', () => {
     expect(ui.selectedEdgeIds.size).toBe(0)
   })
 
+  it('connections drawn from the side handles float (no handle id is stored)', () => {
+    const { addNode: add } = store.getState()
+    add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    add(DEFAULT_NODE_TYPE_ID, { x: 300, y: 0 })
+    const [a, b] = store.getState().doc.nodes.map((n) => n.id) as [string, string]
+    store.getState().connect({ source: a, target: b, sourceHandle: 'right', targetHandle: 'left' })
+    expect(store.getState().doc.edges[0]).toMatchObject({ sourceHandle: null, targetHandle: null })
+  })
+
+  it('refuses connecting two handles of the same node', () => {
+    store.getState().addNode(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })
+    const a = store.getState().doc.nodes[0]!.id
+    const conn = { source: a, target: a, sourceHandle: 'right', targetHandle: 'left' }
+    expect(store.getState().isValidConnection(conn)).toBe(false)
+    store.getState().connect(conn)
+    expect(store.getState().doc.edges).toEqual([])
+  })
+
   it('isValidConnection accepts an Edge-shaped object with undefined handles', () => {
     const { addNode: add } = store.getState()
     add(DEFAULT_NODE_TYPE_ID, { x: 0, y: 0 })

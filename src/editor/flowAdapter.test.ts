@@ -14,6 +14,7 @@ import {
   reduceEdgeChanges,
   reduceNodeChanges,
   SELECTED_EDGE_COLOR,
+  SIDE_HANDLE_IDS,
   toFlowEdges,
   toFlowNodes,
   uiForLoadedDocument,
@@ -46,7 +47,11 @@ describe('toFlowNodes', () => {
         id: 'n_1',
         type: 'graph',
         position: { x: 5, y: 6 },
-        data: { typeId: DEFAULT_NODE_TYPE_ID, values: { title: 'New Technology' } },
+        data: {
+          typeId: DEFAULT_NODE_TYPE_ID,
+          values: { title: 'New Technology' },
+          overrides: {},
+        },
         selected: false,
         measured: undefined,
       },
@@ -64,6 +69,19 @@ describe('toFlowNodes', () => {
     expect(second[0]).toBe(first[0])
     expect(second[1]).not.toBe(first[1])
     expect(second[1]?.position).toEqual({ x: 9, y: 9 })
+  })
+
+  it('rebuilds a node when its style overrides change', () => {
+    const doc = twoNodes()
+    const first = toFlowNodes(doc, emptyUi())
+    const restyled = {
+      ...doc,
+      nodes: doc.nodes.map((n, i) => (i === 0 ? { ...n, styleOverrides: { fill: '#f00' } } : n)),
+    }
+    const second = toFlowNodes(restyled, emptyUi(), first)
+    expect(second[0]).not.toBe(first[0])
+    expect(second[0]?.data.overrides).toEqual({ fill: '#f00' })
+    expect(second[1]).toBe(first[1])
   })
 
   it('passes selection and measured size through', () => {
@@ -194,7 +212,8 @@ describe('toFlowEdges', () => {
       sourceHandle: null,
       targetHandle: null,
       selected: true,
-      type: 'default',
+      type: 'graph',
+      data: { path: 'bezier' },
       style: { stroke: SELECTED_EDGE_COLOR, strokeWidth: 2, strokeDasharray: undefined },
       markerEnd: { type: MarkerType.ArrowClosed, color: SELECTED_EDGE_COLOR },
     })
@@ -224,28 +243,50 @@ describe('toFlowEdges', () => {
     expect(start?.markerEnd).toBeUndefined()
   })
 
-  it('maps each line shape to a React Flow edge type', () => {
+  it('draws every edge with the graph edge component, passing the line shape', () => {
     const base = defaultEdgeType()
     const shapes = ['bezier', 'smoothstep', 'step', 'straight'] as const
-    const flowTypes = shapes.map((path) => {
+    const drawn = shapes.map((path) => {
       const type: EdgeType = { ...base, style: { ...base.style, path } }
-      return toFlowEdges(edges, [type], new Set())[0]?.type
+      const [edge] = toFlowEdges(edges, [type], new Set())
+      return [edge?.type, edge?.data?.path]
     })
-    expect(flowTypes).toEqual(['default', 'smoothstep', 'step', 'straight'])
+    expect(drawn).toEqual(shapes.map((path) => ['graph', path]))
   })
 
   it('falls back to the curve for an unknown or inherited-property path', () => {
     const base = defaultEdgeType()
     for (const path of ['curvy', 'toString']) {
       const type = { ...base, style: { ...base.style, path } } as unknown as EdgeType
-      expect(toFlowEdges(edges, [type], new Set())[0]?.type).toBe('default')
+      expect(toFlowEdges(edges, [type], new Set())[0]?.data?.path).toBe('bezier')
     }
   })
 
   it('renders an edge with an unknown type unstyled instead of failing', () => {
     const [edge] = toFlowEdges(edges, [], new Set())
-    expect(edge).toMatchObject({ id: 'ab', selected: false })
+    expect(edge).toMatchObject({
+      id: 'ab',
+      type: 'graph',
+      selected: false,
+      data: { path: 'bezier' },
+    })
     expect(edge?.style).toBeUndefined()
+  })
+
+  it('keeps side handle ids (fixed anchors) and drops unknown ones (floating)', () => {
+    const [ab] = edges
+    const withHandles = [
+      { ...ab!, id: 'fixed', sourceHandle: 'right', targetHandle: 'left' },
+      { ...ab!, id: 'unknown', sourceHandle: 'out-3', targetHandle: 'in' },
+      { ...ab!, id: 'floating' },
+    ]
+    const result = toFlowEdges(withHandles, [defaultEdgeType()], new Set())
+    expect(result.map((e) => [e.id, e.sourceHandle, e.targetHandle])).toEqual([
+      ['fixed', 'right', 'left'],
+      ['unknown', null, null],
+      ['floating', null, null],
+    ])
+    expect(SIDE_HANDLE_IDS).toEqual(['top', 'right', 'bottom', 'left'])
   })
 })
 

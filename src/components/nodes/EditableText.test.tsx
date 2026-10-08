@@ -89,6 +89,28 @@ describe('EditableText', () => {
     expect(input()).toHaveProperty('value', '')
   })
 
+  it('keeps a blank (spaces only) value double-clickable', () => {
+    render(<EditableText value="   " onCommit={() => {}} label="Name" placeholder="—" />)
+    fireEvent.doubleClick(screen.getByText('—'))
+    expect(input()).toHaveProperty('value', '   ')
+  })
+
+  it('sizes the input to its text', () => {
+    const { open } = setup('A long technology name')
+    open()
+    expect(input().getAttribute('size')).toBe(String('A long technology name'.length + 1))
+  })
+
+  it('shows a placeholder for an empty value, and edits from empty', () => {
+    const onCommit = vi.fn()
+    render(<EditableText value="" onCommit={onCommit} label="Name" placeholder="—" />)
+    fireEvent.doubleClick(screen.getByText('—'))
+    expect(input()).toHaveProperty('value', '')
+    fireEvent.change(input(), { target: { value: 'X' } })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith('X')
+  })
+
   it('marks the editor so React Flow does not drag, pan or zoom from it', () => {
     const { open } = setup()
     expect(screen.getByTitle('Double-click to edit').className).toContain('nopan')

@@ -97,9 +97,68 @@ body,
   cursor: pointer;
 }
 
-.canvas {
+.workspace {
+  display: flex;
   flex: 1;
   min-height: 0;
+}
+
+.canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspector {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--panel);
+  border-left: 1px solid var(--panel-border);
+}
+
+.inspector__heading {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inspector__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.inspector__label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.inspector__row input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.inspector__row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.inspector__value {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.inspector__note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .graph-node {
@@ -108,8 +167,59 @@ body,
   color: var(--text);
 }
 
+/* Side handles only show on hovered or selected nodes, and on every node while a connection is
+   being dragged, so four dots per node don't clutter the tree. */
+.react-flow__node .react-flow__handle {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle,
+.canvas--connecting .react-flow__handle {
+  opacity: 1;
+}
+
+/* Selected nodes get an accent outline, so it is clear what the inspector is showing. */
+.react-flow__node.selected .graph-node {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .graph-node--rounded {
   border-radius: var(--radius);
+}
+
+.graph-node--rect {
+  border-radius: 2px;
+}
+
+.graph-node--pill {
+  border-radius: 999px;
+  padding-inline: 20px;
+}
+
+/* Circle: square box (height set inline), content centred and kept inside the circle. */
+.graph-node--circle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* `safe`: if content is too tall it is clipped at the bottom, never the title at the top. */
+  justify-content: safe center;
+  gap: 2px;
+  border-radius: 50%;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+/* Clip long content inside the circle; the node itself must not clip, or the connection
+   handles (half outside the outline) would be cut off. */
+.graph-node--circle .graph-node__body {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.graph-node--circle .graph-node__line {
+  margin-top: 2px;
 }
 
 .graph-node--missing {
@@ -117,8 +227,32 @@ body,
   color: var(--error);
 }
 
-.graph-node__field {
+.graph-node__title {
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.graph-node__line {
+  margin-top: 4px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.graph-node__label {
+  color: var(--text-muted);
+}
+
+.graph-node__value {
+  display: inline;
+}
+
+/* Rich text keeps its line breaks and is clipped to three lines on the card. */
+.graph-node__line--richtext {
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .graph-node__input {
@@ -130,4 +264,17 @@ body,
   border-radius: 4px;
   padding: 0 4px;
   margin: 0;
+}
+
+/* Editing a "Label: value" line keeps the input on the label's line. */
+.graph-node__line .graph-node__input {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+.editable--empty {
+  color: var(--text-muted);
+  font-weight: normal;
 }
