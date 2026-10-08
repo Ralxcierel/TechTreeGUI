@@ -33,12 +33,20 @@ export function parseDocument(text: string): ParseResult {
   if (!isPlainObject(obj.meta)) {
     return { ok: false, error: 'Missing "meta" object.' }
   }
-  if (!isPlainObject(obj.view)) {
-    return { ok: false, error: 'Missing "view" object.' }
+  if (!isPlainObject(obj.view) || !isPlainObject(obj.view.viewport)) {
+    return { ok: false, error: 'Missing "view.viewport" object.' }
+  }
+  const { x, y, zoom } = obj.view.viewport
+  if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(zoom) || zoom <= 0) {
+    return { ok: false, error: '"view.viewport" needs numeric x, y and a positive zoom.' }
   }
 
   // Node/edge/type contents are not checked yet; increment 3 adds the full validator.
   return { ok: true, doc: obj as unknown as GraphDocument }
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

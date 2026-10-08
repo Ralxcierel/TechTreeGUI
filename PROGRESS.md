@@ -3,29 +3,32 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Where we are
-- **DESIGN Phase 1, workflow Phase 2:** the walking skeleton is **built and reviewed. It is waiting for the developer's review at the gate.**
-- Branch: `phase1-skeleton` (pushed to origin).
-- Next: once the developer approves, start **Increment 1** (move and delete nodes, Background/Controls/MiniMap, save and restore the viewport).
+- **DESIGN Phase 1, workflow Phase 3:** the skeleton is approved. **Increment 1 of 4 is built, reviewed and committed. It is waiting for the developer's review at the gate.**
+- Branch: `phase1-skeleton`. The skeleton commit is pushed; the Increment 1 commit is local until the developer approves the push.
+- Next: once the developer approves, start **Increment 2**: connect and delete edges (S2, S7), with the arrow style taken from the edge type.
 
 ## Done
-- Plan approved: schema S1–S10, decisions D1–D6, A1 (see `docs/PLAN.md`).
-- Scaffold: Vite 8, React 19, TypeScript 6 (strict), ESLint 10 flat config + Prettier, Vitest 5.
-- `src/model/`: types, defaults (`technology` node type, `prereq` edge type), ids, `addNode`, `withModified`, `serialize`, minimal `parseDocument`.
-- `src/editor/`: Zustand store (`doc`, `addNode`, `loadDocument`, `markSaved`) and the React Flow adapter (`toFlowNodes`, `toFlowEdges`, `paneCenter`).
-- `src/components/`: `Canvas` (controlled React Flow), `Toolbar` (Add node / Save / Load, inline error), `nodes/GraphNode` (generic, built from the node type, with top/bottom handles).
-- `src/io/fileIO.ts`: download and safe file names.
-- 11 unit tests pass. Lint, Prettier and build are clean.
-- Manual check in the dev server: added 5 nodes, saved, reloaded (empty canvas), loaded the file, and got identical IDs and positions. A bad file shows the error and leaves the graph untouched. A loaded edge renders.
-- Independent review: 2 rounds. Round 1 found 1 bug and 2 should-fixes, all fixed; round 2 found no bugs. Details are in the commit message.
+- **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
+- **Increment 1:**
+  - Model: `moveNodes`, `deleteNodes` (edges cascade, S8), `setViewport`. `parseDocument` now requires a numeric `view.viewport`.
+  - Editor: the store holds `doc`, `ui` (selection and measured sizes, never saved) and the derived `flowNodes`. `reduceNodeChanges` turns React Flow's change events into model updates. `toFlowNodes` reuses unchanged node objects and passes back `measured`, so nodes no longer flicker. `markSaved(viewport)` stamps the save time and stores the viewport.
+  - UI: drag, select, Delete/Backspace, dotted Background, Controls, and a MiniMap colored by node type. The viewport is captured on Save and restored on Load.
+  - 36 unit tests (model, adapter, store). Lint, Prettier and build are clean.
+  - Independent review, 2 rounds. Round 1 found no bugs but a store test gap, plus nits; all fixed. Round 2 found no bugs; nits fixed (numeric viewport check, viewport round-trip test, keep measured sizes only when the type matches).
+
+## Verification notes
+- The browser pane was hidden during this increment. A hidden page doesn't run animation frames or ResizeObserver, so these could not be checked visually: node visibility after measuring, edge drawing, and the absence of flicker.
+- Checked instead with synthetic mouse and keyboard events against the real React Flow handlers: drag updates the saved position, Delete removes the node (and the edge cascade in the model tests), the viewport is saved and restored exactly, and a bad viewport file is rejected.
+- **To do at the gate:** a quick visual check in a visible browser. Drag, delete a node with an edge, zoom, save, reload, load.
 
 ## Open items
-- Resolved: `noUncheckedIndexedAccess` enabled (developer approved).
-- **[ASSUMPTION]** The Vite template now ships oxlint. ESLint (per CLAUDE.md) is used instead, with the classic Vite ESLint packages (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`).
-- **[ASSUMPTION]** Prettier ignores `*.md` so it never reformats DESIGN.md or CLAUDE.md.
+- **[ASSUMPTION]** The viewport is captured at Save time and is not tracked live.
+- **[ASSUMPTION]** Delete and Backspace both delete.
+- **[ASSUMPTION]** Selection and measured sizes are editor-only and never saved. On Load, a node keeps its size if its id and type still match.
+- **[ASSUMPTION]** The Vite template ships oxlint. ESLint (per CLAUDE.md) is used instead.
+- **[ASSUMPTION]** Prettier ignores `*.md`.
 
-## Known rough edges (by design until later increments)
-- Nodes can't be dragged, selected or deleted yet (Increment 1).
-- Every document change rebuilds all React Flow node objects, so existing nodes re-measure and flicker for one frame on Add. Fix this in Increment 1 by handling `onNodesChange` and keeping `measured` sizes.
-- `parseDocument` checks only the top-level shape. A file with a malformed node can still crash rendering (Increment 3).
-- `toFlowEdges` drops `sourceHandle`/`targetHandle`, and edges use React Flow's default style (Increment 2).
-- The viewport is not saved or restored yet. After Load, nodes may be off-screen if you had panned (Increment 1).
+## Known rough edges (planned for later increments)
+- Edges can't be created, selected or deleted directly yet, and they use React Flow's default style (Increment 2). `toFlowEdges` drops `sourceHandle`/`targetHandle`.
+- `parseDocument` still checks only the top level plus the viewport. A malformed node can crash rendering (Increment 3).
+- Nodes can't be renamed yet (Increment 4).

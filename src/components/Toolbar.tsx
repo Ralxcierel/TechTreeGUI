@@ -1,4 +1,4 @@
-import { useStoreApi } from '@xyflow/react'
+import { useReactFlow, useStoreApi } from '@xyflow/react'
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useEditorStore } from '../editor/store'
 import { paneCenter } from '../editor/flowAdapter'
@@ -9,6 +9,7 @@ const STACK_OFFSET = 24
 
 export function Toolbar() {
   const flowStore = useStoreApi()
+  const { getViewport, setViewport } = useReactFlow()
   const fileInput = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,7 +32,7 @@ export function Toolbar() {
   }
 
   const handleSave = () => {
-    const saved = useEditorStore.getState().markSaved()
+    const saved = useEditorStore.getState().markSaved(getViewport())
     downloadText(fileNameFor(saved.meta.name), serialize(saved))
     setError(null)
   }
@@ -50,6 +51,7 @@ export function Toolbar() {
     const result = parseDocument(text)
     if (result.ok) {
       useEditorStore.getState().loadDocument(result.doc)
+      void setViewport(result.doc.view.viewport)
       setError(null)
     } else {
       setError(`Could not load ${file.name}: ${result.error}`)

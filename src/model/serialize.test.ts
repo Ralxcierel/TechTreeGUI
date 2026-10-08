@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
-import { addNode } from './operations'
+import { addNode, setViewport } from './operations'
 import { parseDocument, serialize } from './serialize'
 import type { GraphDocument } from './types'
 
@@ -31,6 +31,23 @@ describe('serialize / parseDocument', () => {
   it('rejects a meta that is an array', () => {
     const text = JSON.stringify({ ...createEmptyDocument(), meta: [] })
     expect(parseDocument(text)).toEqual({ ok: false, error: 'Missing "meta" object.' })
+  })
+
+  it('round-trips a non-default viewport', () => {
+    const doc = setViewport(createEmptyDocument(), { x: -12.5, y: 40, zoom: 1.44 })
+    const result = parseDocument(serialize(doc))
+    expect(result.ok && result.doc.view.viewport).toEqual({ x: -12.5, y: 40, zoom: 1.44 })
+  })
+
+  it('rejects a viewport with non-numeric values', () => {
+    const doc = createEmptyDocument()
+    const text = JSON.stringify({ ...doc, view: { viewport: { x: 0, y: 0, zoom: '2' } } })
+    expect(parseDocument(text)).toMatchObject({ ok: false })
+  })
+
+  it('rejects a view without a viewport', () => {
+    const text = JSON.stringify({ ...createEmptyDocument(), view: {} })
+    expect(parseDocument(text)).toEqual({ ok: false, error: 'Missing "view.viewport" object.' })
   })
 
   it('rejects a document missing its nodes array', () => {

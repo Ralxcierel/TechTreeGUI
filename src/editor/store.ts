@@ -1,29 +1,67 @@
 // The editor store: the single source of truth for the open document.
 // Components read slices of it with `useEditorStore(selector)` and change it only through actions.
+import type { NodeChange } from '@xyflow/react'
 import { create } from 'zustand'
 import {
   addNode,
   createEmptyDocument,
+  setViewport,
   withModified,
   type GraphDocument,
   type Position,
+  type Viewport,
 } from '../model'
+import {
+  emptyUi,
+  reduceNodeChanges,
+  toFlowNodes,
+  uiForLoadedDocument,
+  type FlowNode,
+  type UiState,
+} from './flowAdapter'
 
 interface EditorState {
   doc: GraphDocument
+  ui: UiState
+  /** React Flow nodes derived from `doc` + `ui`; kept here so unchanged nodes keep their identity. */
+  flowNodes: FlowNode[]
   addNode: (typeId: string, position: Position) => void
+  onNodesChange: (changes: NodeChange[]) => void
   loadDocument: (doc: GraphDocument) => void
-  /** Stamps `meta.modified` and returns the document to write to disk. */
-  markSaved: () => GraphDocument
+  /** Records the current viewport, stamps `meta.modified`, and returns the document to write. */
+  markSaved: (viewport: Viewport) => GraphDocument
 }
 
+/** Recomputes `flowNodes` when `doc` or `ui` changed. */
+function derive(
+  prev: Pick<EditorState, 'doc' | 'ui' | 'flowNodes'>,
+  doc: GraphDocument,
+  ui: UiState,
+): Pick<EditorState, 'doc' | 'ui' | 'flowNodes'> {
+  if (doc === prev.doc && ui === prev.ui) return prev
+  return { doc, ui, flowNodes: toFlowNodes(doc, ui, prev.flowNodes) }
+}
+
+const initialDoc = createEmptyDocument()
+
 export const useEditorStore = create<EditorState>()((set, get) => ({
-  doc: createEmptyDocument(),
-  addNode: (typeId, position) => set((s) => ({ doc: addNode(s.doc, typeId, position) })),
-  loadDocument: (doc) => set({ doc }),
-  markSaved: () => {
-    const doc = withModified(get().doc)
-    set({ doc })
+  doc: initialDoc,
+  ui: emptyUi(),
+  flowNodes: [],
+  addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
+  onNodesChange: (changes) =>
+    set((s) => {
+      const next = reduceNodeChanges(s.doc, s.ui, changes)
+      return derive(s, next.doc, next.ui)
+    }),
+  loadDocument: (doc) =>
+    set((s) => {
+      const ui = uiForLoadedDocument(doc, s.doc, s.ui)
+      return { doc, ui, flowNodes: toFlowNodes(doc, ui) }
+    }),
+  markSaved: (viewport) => {
+    const doc = withModified(setViewport(get().doc, viewport))
+    set((s) => derive(s, doc, s.ui))
     return doc
   },
 }))
