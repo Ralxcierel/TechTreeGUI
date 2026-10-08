@@ -7,13 +7,17 @@ import {
   connect,
   connectionError,
   createEmptyDocument,
+  removeNodeData,
   renameDocument,
+  setEdgeType,
+  setStyleOverride,
   DEFAULT_EDGE_TYPE_ID,
   setViewport,
   updateNodeData,
   withModified,
   type EdgeEnds,
   type GraphDocument,
+  type NodeStyle,
   type Position,
   type Viewport,
 } from '../model'
@@ -47,6 +51,16 @@ interface EditorState {
   connect: (connection: Connection) => void
   /** Sets one value in a node's data, e.g. its title. */
   setNodeField: (nodeId: string, key: string, value: unknown) => void
+  /** Removes one value from a node's data (the card then shows "—"). */
+  removeNodeField: (nodeId: string, key: string) => void
+  /** Sets one style override on a node; `undefined` resets it to the type's value. */
+  setNodeStyleOverride: <K extends keyof NodeStyle>(
+    nodeId: string,
+    key: K,
+    value: NodeStyle[K] | undefined,
+  ) => void
+  /** Changes an edge's type. Returns why not, or null when it worked. */
+  setEdgeType: (edgeId: string, typeId: string) => string | null
   /** Renames the document (also the save file name). */
   setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
@@ -110,6 +124,15 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }),
   setNodeField: (nodeId, key, value) =>
     set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
+  removeNodeField: (nodeId, key) => set((s) => derive(s, removeNodeData(s.doc, nodeId, key), s.ui)),
+  setNodeStyleOverride: (nodeId, key, value) =>
+    set((s) => derive(s, setStyleOverride(s.doc, nodeId, key, value), s.ui)),
+  setEdgeType: (edgeId, typeId) => {
+    const result = setEdgeType(get().doc, edgeId, typeId)
+    if (!result.ok) return result.error
+    set((s) => derive(s, result.doc, s.ui))
+    return null
+  },
   setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
   loadDocument: (doc) =>
     set((s) => {

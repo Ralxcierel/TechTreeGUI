@@ -3,10 +3,10 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Where we are
-- **DESIGN Phase 2, increment P2-2 (cards from types) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 and P2-1 were approved.
+- **DESIGN Phase 2, increment P2-3 (full inspector) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-2 were approved.
 - The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12. Q1: the radial roadmap was added to `docs/DESIGN.md` (additions only). Q2: starter types Technology, Era and Note.
 - DESIGN Phase 1 is complete on `phase1-skeleton`. The **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
-- Next: once the developer approves, **P2-3, the full inspector**: an editor for each field kind, style overrides with reset, an "Other data" section, a warning badge for values that don't fit their kind (D7), and changing a selected edge's type.
+- Next: once the developer approves, **P2-4, edge types**: a Library panel (left) listing edge types; create, edit and delete them (name, meaning, colour, width, dash, arrow, line shape); the active edge type is used for new connections; deleting a type in use is blocked (D8).
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -32,6 +32,26 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - Shapes: rounded, rect, pill, and circle (square, with content clipped inside an inner body so the handles stay grabbable). Edges attach to circles' round outline. Overrides apply to the card, the edges and the minimap colour.
   - 219 tests, including RTL tests for `GraphNode`. In the browser with real input: Era as a true circle with edges on its outline, a pill override with custom colours, every field kind on a card, rich text clipped, an over-long circle title clipped at the bottom, title editing in a circle, and the circle's handle hit-testable outside the outline.
   - Independent review, 3 rounds. Round 1 had no bugs but 4 should-fixes: overflow clipping the title, empty values with no click target, the inline editor wrapping, object list items. Round 2 found that the circle's clipping cut its connection handles in half. All fixed. Round 3 was clean.
+- **P2-3 full inspector:**
+  - An editor per field kind in `src/components/inspector/fields/`:
+    - text and image (emptying an image removes it)
+    - rich text as a textarea
+    - number: keeps a draft while typing, saves only real numbers, ignores half-typed input like "-", and shows the saved value on leaving
+    - enum as a select ("—" clears it)
+    - boolean as a checkbox
+    - list as a textarea, one item per line
+  - A value that doesn't fit its field shows a warning, the raw value and **Clear value** (D7), using the shared `src/model/fieldValues.ts`.
+  - **Style overrides** for shape, width, fill and border, each with "(from type)" or Reset (D3). Colours have a picker plus a text box; only complete, fixed CSS colours are saved, and emptying the box resets.
+  - **Other data** (keys the type doesn't define) with Delete (D9).
+  - **Edge inspector:** "source → target", plus an edge-type dropdown. Changes that break S7 are refused with an inline error.
+  - Model: `removeNodeData`, `setStyleOverride`, `setEdgeType`.
+  - **Tightening:** list values (including field defaults when loading) must contain only strings. A file whose list *default* holds non-strings is now rejected; node values that don't fit still load and get the warning.
+  - 266 tests. In the browser with real input:
+    - cleared a bad value, typed a cost, typed "-" then "-5" (the value isn't lost on "-"), ticked a checkbox, picked an enum
+    - overrode the shape to pill and the fill colour, with the card updating live
+    - Other data listed and Delete worked
+    - changed an edge's type, which re-drew it dashed
+  - Independent review, 3 rounds, no bugs. Round 1 had 5 should-fixes: partial colours saved, "-" wiped numbers, non-text list items mangled, duplicate picker labels, width clear state. Round 2 had 2: rejected numbers staying on screen, an untested load tightening. Round 3 found 1 test that could never fail. All fixed.
 
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
@@ -68,6 +88,9 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **[ASSUMPTION]** Side handles are hidden until a node is hovered or selected, or a connection is being dragged.
 - **[ASSUMPTION]** The first card field (if text) is the card's title, with no label. Lists show 3 items + "+N more". Rich text is clipped to 3 lines. Only text fields can be edited on the card (on-card dropdowns are Phase 3).
 - Known: a pill with many lines gets large rounded ends that crowd its text, and edges treat pills as rectangles. Pills are best for short cards.
+- **[ASSUMPTION]** Clearing a field (an empty number, "—" in a dropdown, an emptied image) removes the value, so the card shows "—".
+- **[ASSUMPTION]** An override equal to the type's value is kept (it pins the node if the type changes later). Use Reset to follow the type.
+- Known: while you delete characters in a colour box, intermediate valid colours (e.g. `#1234`) are saved, so the card flickers briefly.
 - Known: when two nodes overlap, a floating edge's anchors can cross, so the arrow points the wrong way until the nodes are moved apart.
 - **[ASSUMPTION]** Rename applies to every `text` field shown on the card, not just "title" (data-driven, per CLAUDE.md). An empty value is allowed.
 - **[ASSUMPTION]** "Unsaved changes" compares document objects, not content. Changing a value and then changing it back still counts as unsaved.

@@ -135,7 +135,9 @@ body,
   color: var(--text-muted);
 }
 
-.inspector__row input {
+.inspector__row input:not([type='checkbox']):not([type='color']),
+.inspector__row select,
+.inspector__row textarea {
   font: inherit;
   color: var(--text);
   background: var(--bg);
@@ -144,12 +146,27 @@ body,
   padding: 5px 8px;
 }
 
-.inspector__row input:focus {
+.inspector__row textarea {
+  resize: vertical;
+}
+
+.inspector__row input[type='checkbox'] {
+  align-self: flex-start;
+  width: 16px;
+  height: 16px;
+}
+
+.inspector__row input:focus,
+.inspector__row select:focus,
+.inspector__row textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
 
 .inspector__value {
+  display: block;
+  max-height: 8em;
+  overflow: auto;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 13px;
   overflow-wrap: anywhere;
@@ -277,4 +294,84 @@ body,
 .editable--empty {
   color: var(--text-muted);
   font-weight: normal;
+}
+
+.inspector__subheading {
+  margin: 18px 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inspector__row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.inspector__from-type {
+  font-style: italic;
+}
+
+.inspector__link {
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.inspector__button {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.inspector__color {
+  display: flex;
+  gap: 6px;
+}
+
+.inspector__color input[type='color'] {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.inspector__color input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspector__mismatch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+}
+
+.inspector__badge {
+  font-size: 12px;
+  color: #f59e0b;
+}
+
+.inspector__error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--error);
 }

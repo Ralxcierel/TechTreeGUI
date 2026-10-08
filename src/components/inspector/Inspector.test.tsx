@@ -80,12 +80,12 @@ describe('Inspector', () => {
     expect(screen.getByText('2 nodes, 1 edge selected.')).toBeTruthy()
   })
 
-  it('summarises an edge-only selection', () => {
+  it('shows the edge inspector for a single selected edge', () => {
     const ids = addNodes(2)
     s().connect({ source: ids[0]!, target: ids[1]!, sourceHandle: null, targetHandle: null })
     render(<Inspector />)
     select([], [s().doc.edges[0]!.id])
-    expect(screen.getByText('1 edge selected.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Edge' })).toBeTruthy()
   })
 
   it('says so when a node has an unknown type', () => {
@@ -96,28 +96,6 @@ describe('Inspector', () => {
     render(<Inspector />)
     select([id!])
     expect(screen.getByText('This node has an unknown type (gone).')).toBeTruthy()
-  })
-
-  it('shows non-text fields and non-string text values read-only', () => {
-    const [id] = addNodes(1)
-    const doc = s().doc
-    const tech = doc.nodeTypes[0]!
-    const withCost = {
-      ...tech,
-      fields: [...tech.fields, { key: 'cost', label: 'Cost', kind: 'number' as const, show: [] }],
-    }
-    store.setState({
-      doc: {
-        ...doc,
-        nodeTypes: [withCost, ...doc.nodeTypes.slice(1)],
-        nodes: doc.nodes.map((n) => ({ ...n, data: { title: 42, cost: 150 } })),
-      },
-    })
-    render(<Inspector />)
-    select([id!])
-    expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.getByText('42')).toBeTruthy()
-    expect(screen.getByText('150')).toBeTruthy()
   })
 
   it('returns to the document view when the selected node is deleted', () => {
