@@ -11,6 +11,7 @@ import { chooseEnds, edgePath } from '../../editor/edgePath'
 import { useEditorStore } from '../../editor/store'
 import type { FlowEdge, FlowNode } from '../../editor/flowAdapter'
 import { floatingAnchors, outlineForShape, type Box } from '../../editor/floatingEdge'
+import { resolveNodeStyle } from '../../model'
 
 function boxOf(node: InternalNode<FlowNode>): Box {
   const { x, y } = node.internals.positionAbsolute
@@ -24,8 +25,10 @@ export function GraphEdge(props: EdgeProps<FlowEdge>) {
   const nodeTypes = useEditorStore((s) => s.doc.nodeTypes)
   if (!sourceNode || !targetNode) return null
 
-  const shapeOf = (node: InternalNode<FlowNode>) =>
-    nodeTypes.find((t) => t.id === node.data.typeId)?.style.shape
+  const shapeOf = (node: InternalNode<FlowNode>) => {
+    const base = nodeTypes.find((t) => t.id === node.data.typeId)?.style
+    return base ? resolveNodeStyle(base, node.data.overrides).shape : undefined
+  }
   const floating = floatingAnchors(
     boxOf(sourceNode),
     outlineForShape(shapeOf(sourceNode)),

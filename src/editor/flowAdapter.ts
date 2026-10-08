@@ -8,13 +8,19 @@ import {
   type EdgeType,
   type GraphDocument,
   type GraphEdge,
+  type NodeStyle,
   type Position,
 } from '../model'
 
 /** Colour of a selected edge and its arrowheads (matches `--accent` in styles/app.css). */
 export const SELECTED_EDGE_COLOR = '#38bdf8'
 
-export type GraphNodeData = { typeId: string; values: Record<string, unknown> }
+export type GraphNodeData = {
+  typeId: string
+  values: Record<string, unknown>
+  /** The node's own style overrides, merged over its type's style when drawn. */
+  overrides: Partial<NodeStyle>
+}
 export type FlowNode = Node<GraphNodeData, 'graph'>
 
 export interface Size {
@@ -68,6 +74,7 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
       old &&
       old.position === n.position &&
       old.data.values === n.data &&
+      old.data.overrides === n.styleOverrides &&
       old.data.typeId === n.typeId &&
       old.selected === selected &&
       old.measured === measured
@@ -78,7 +85,7 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
       id: n.id,
       type: 'graph',
       position: n.position,
-      data: { typeId: n.typeId, values: n.data },
+      data: { typeId: n.typeId, values: n.data, overrides: n.styleOverrides },
       selected,
       measured,
     }

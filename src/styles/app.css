@@ -189,13 +189,70 @@ body,
   border-radius: var(--radius);
 }
 
+.graph-node--rect {
+  border-radius: 2px;
+}
+
+.graph-node--pill {
+  border-radius: 999px;
+  padding-inline: 20px;
+}
+
+/* Circle: square box (height set inline), content centred and kept inside the circle. */
+.graph-node--circle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* `safe`: if content is too tall it is clipped at the bottom, never the title at the top. */
+  justify-content: safe center;
+  gap: 2px;
+  border-radius: 50%;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+/* Clip long content inside the circle; the node itself must not clip, or the connection
+   handles (half outside the outline) would be cut off. */
+.graph-node--circle .graph-node__body {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.graph-node--circle .graph-node__line {
+  margin-top: 2px;
+}
+
 .graph-node--missing {
   border-color: var(--error);
   color: var(--error);
 }
 
-.graph-node__field {
+.graph-node__title {
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.graph-node__line {
+  margin-top: 4px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.graph-node__label {
+  color: var(--text-muted);
+}
+
+.graph-node__value {
+  display: inline;
+}
+
+/* Rich text keeps its line breaks and is clipped to three lines on the card. */
+.graph-node__line--richtext {
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .graph-node__input {
@@ -207,4 +264,17 @@ body,
   border-radius: 4px;
   padding: 0 4px;
   margin: 0;
+}
+
+/* Editing a "Label: value" line keeps the input on the label's line. */
+.graph-node__line .graph-node__input {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+.editable--empty {
+  color: var(--text-muted);
+  font-weight: normal;
 }

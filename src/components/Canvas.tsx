@@ -9,6 +9,7 @@ import {
 import { useCallback, useMemo, useState } from 'react'
 import { useEditorStore } from '../editor/store'
 import { toFlowEdges, type FlowNode } from '../editor/flowAdapter'
+import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
 
@@ -36,8 +37,10 @@ export function Canvas() {
     [docEdges, edgeTypeList, selectedEdgeIds],
   )
   const miniMapColor = useCallback(
-    (node: FlowNode) =>
-      nodeTypeList.find((t) => t.id === node.data.typeId)?.style.fill ?? '#64748b',
+    (node: FlowNode) => {
+      const base = nodeTypeList.find((t) => t.id === node.data.typeId)?.style
+      return base ? resolveNodeStyle(base, node.data.overrides).fill : '#64748b'
+    },
     [nodeTypeList],
   )
 

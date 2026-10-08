@@ -47,7 +47,11 @@ describe('toFlowNodes', () => {
         id: 'n_1',
         type: 'graph',
         position: { x: 5, y: 6 },
-        data: { typeId: DEFAULT_NODE_TYPE_ID, values: { title: 'New Technology' } },
+        data: {
+          typeId: DEFAULT_NODE_TYPE_ID,
+          values: { title: 'New Technology' },
+          overrides: {},
+        },
         selected: false,
         measured: undefined,
       },
@@ -65,6 +69,19 @@ describe('toFlowNodes', () => {
     expect(second[0]).toBe(first[0])
     expect(second[1]).not.toBe(first[1])
     expect(second[1]?.position).toEqual({ x: 9, y: 9 })
+  })
+
+  it('rebuilds a node when its style overrides change', () => {
+    const doc = twoNodes()
+    const first = toFlowNodes(doc, emptyUi())
+    const restyled = {
+      ...doc,
+      nodes: doc.nodes.map((n, i) => (i === 0 ? { ...n, styleOverrides: { fill: '#f00' } } : n)),
+    }
+    const second = toFlowNodes(restyled, emptyUi(), first)
+    expect(second[0]).not.toBe(first[0])
+    expect(second[0]?.data.overrides).toEqual({ fill: '#f00' })
+    expect(second[1]).toBe(first[1])
   })
 
   it('passes selection and measured size through', () => {
