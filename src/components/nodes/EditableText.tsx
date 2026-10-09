@@ -1,6 +1,6 @@
 // Text on a node card that turns into an input on double-click.
 // Enter or clicking away saves; Escape cancels.
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 interface EditableTextProps {
   value: string
@@ -10,6 +10,8 @@ interface EditableTextProps {
   label: string
   /** Shown (muted) instead of an empty value, so there is something to double-click. */
   placeholder?: string
+  /** Told when editing starts (true) and ends (false), e.g. so the card can hide its tooltip. */
+  onEditingChange?: (editing: boolean) => void
 }
 
 export function EditableText({
@@ -18,11 +20,24 @@ export function EditableText({
   className,
   label,
   placeholder,
+  onEditingChange,
 }: EditableTextProps) {
   // `draft` is null while not editing.
   const [draft, setDraft] = useState<string | null>(null)
   // Set once an edit ends, so a late blur (e.g. after Escape) can't commit it a second time.
   const ended = useRef(false)
+  // The latest callback, so the unmount cleanup below can report the end of an edit.
+  const report = useRef(onEditingChange)
+  useEffect(() => {
+    report.current = onEditingChange
+  })
+  const editing = draft !== null
+  useEffect(() => {
+    if (!editing) return
+    report.current?.(true)
+    // Runs when the edit ends, or if the card goes away mid-edit.
+    return () => report.current?.(false)
+  }, [editing])
 
   const start = () => {
     ended.current = false

@@ -1,7 +1,9 @@
-// Shown when exactly one node is selected: its type and field values.
-// Built from the node's type, like the card: one row per field.
+// Shown when exactly one node is selected: its field values, its style overrides, and any stored
+// data its type doesn't define. Built from the node's type, like the card.
 import { useEditorStore } from '../../editor/store'
-import { LabeledInput } from './LabeledInput'
+import { FieldEditor } from './fields/FieldEditor'
+import { OtherData } from './OtherData'
+import { StyleOverrides } from './StyleOverrides'
 
 interface NodeInspectorProps {
   nodeId: string
@@ -12,36 +14,30 @@ export function NodeInspector({ nodeId }: NodeInspectorProps) {
   const nodeType = useEditorStore((s) =>
     node ? s.doc.nodeTypes.find((t) => t.id === node.typeId) : undefined,
   )
-  const setNodeField = useEditorStore((s) => s.setNodeField)
 
   if (!node) return null
   if (!nodeType) {
     return <p className="inspector__note">This node has an unknown type ({node.typeId}).</p>
   }
 
+  const fieldKeys = new Set(nodeType.fields.map((f) => f.key))
+  const otherEntries = Object.entries(node.data).filter(([key]) => !fieldKeys.has(key))
+
   return (
     <>
       <h2 className="inspector__heading">{nodeType.name}</h2>
-      {nodeType.fields.map((field) => {
-        const value = node.data[field.key]
-        // Only strings (or nothing yet) are edited as text, so a stray number or object in a
-        // text field is never silently turned into a string.
-        const editable = field.kind === 'text' && (value === undefined || typeof value === 'string')
-        return editable ? (
-          <LabeledInput
+      <section aria-label="Fields">
+        {nodeType.fields.map((field) => (
+          <FieldEditor
             key={field.key}
-            label={field.label}
-            value={value ?? ''}
-            onChange={(value) => setNodeField(node.id, field.key, value)}
+            nodeId={node.id}
+            field={field}
+            value={Object.hasOwn(node.data, field.key) ? node.data[field.key] : undefined}
           />
-        ) : (
-          // Editors for the other field kinds come with the full inspector.
-          <div key={field.key} className="inspector__row">
-            <span className="inspector__label">{field.label}</span>
-            <span className="inspector__value">{JSON.stringify(value ?? null)}</span>
-          </div>
-        )
-      })}
+        ))}
+      </section>
+      <StyleOverrides nodeId={node.id} typeStyle={nodeType.style} overrides={node.styleOverrides} />
+      <OtherData nodeId={node.id} entries={otherEntries} />
     </>
   )
 }

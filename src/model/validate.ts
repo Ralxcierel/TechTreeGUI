@@ -4,6 +4,7 @@
 // - Optional keys get their defaults; everything else is required (schema rule S6).
 // - Keys the app doesn't know are kept on every object, so they survive a save (S5).
 import { isFiniteNumber, isPlainObject } from './guards'
+import { fieldValueProblem } from './fieldValues'
 import { connectionError } from './operations'
 import {
   CURRENT_SCHEMA_VERSION,
@@ -231,30 +232,7 @@ function checkDefault(
   options: readonly string[] | undefined,
   path: string,
 ): boolean {
-  let problem: string | null = null
-  switch (kind) {
-    case 'text':
-    case 'richtext':
-      if (typeof value !== 'string') problem = `must be a string for a "${kind}" field.`
-      break
-    case 'image':
-      if (typeof value !== 'string' && value !== null) {
-        problem = 'must be a string or null for an "image" field.'
-      }
-      break
-    case 'number':
-      if (!isFiniteNumber(value)) problem = 'must be a finite number for a "number" field.'
-      break
-    case 'boolean':
-      if (typeof value !== 'boolean') problem = 'must be true or false for a "boolean" field.'
-      break
-    case 'list':
-      if (!Array.isArray(value)) problem = 'must be an array for a "list" field.'
-      break
-    case 'enum':
-      if (!options?.includes(value as string)) problem = `must be ${list(options ?? [])}.`
-      break
-  }
+  const problem = fieldValueProblem(kind, value, options)
   if (problem) r.fail(path, problem)
   return problem === null
 }

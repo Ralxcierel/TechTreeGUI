@@ -162,7 +162,8 @@ describe('field definitions', () => {
     [{ kind: 'richtext', default: 3 }, 'must be a string for a "richtext" field.'],
     [{ kind: 'number', default: '3' }, 'must be a finite number for a "number" field.'],
     [{ kind: 'boolean', default: 'yes' }, 'must be true or false for a "boolean" field.'],
-    [{ kind: 'list', default: 'a' }, 'must be an array for a "list" field.'],
+    [{ kind: 'list', default: 'a' }, 'must be an array of strings for a "list" field.'],
+    [{ kind: 'list', default: ['a', 1] }, 'must be an array of strings for a "list" field.'],
     [{ kind: 'image', default: 5 }, 'must be a string or null for an "image" field.'],
     [{ kind: 'enum', options: ['A', 'B'], default: 'C' }, 'must be one of "A", "B".'],
   ])('checks the default against the kind: %o', (patch, message) => {

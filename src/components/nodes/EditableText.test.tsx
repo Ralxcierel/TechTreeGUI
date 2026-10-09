@@ -118,3 +118,27 @@ describe('EditableText', () => {
     expect(input().className).toMatch(/\bnodrag\b.*\bnopan\b/)
   })
 })
+
+describe('EditableText: onEditingChange', () => {
+  it('reports the start and end of an edit, and the end if it goes away mid-edit', () => {
+    const onEditingChange = vi.fn()
+    const view = render(
+      <EditableText
+        value="Fire"
+        onCommit={() => {}}
+        label="Name"
+        onEditingChange={onEditingChange}
+      />,
+    )
+    fireEvent.doubleClick(screen.getByTitle('Double-click to edit'))
+    expect(onEditingChange).toHaveBeenLastCalledWith(true)
+    fireEvent.keyDown(input(), { key: 'Escape' })
+    expect(onEditingChange).toHaveBeenLastCalledWith(false)
+
+    fireEvent.doubleClick(screen.getByTitle('Double-click to edit'))
+    expect(onEditingChange).toHaveBeenLastCalledWith(true)
+    view.unmount() // e.g. the field was removed from the type while being edited
+    expect(onEditingChange).toHaveBeenLastCalledWith(false)
+    expect(onEditingChange).toHaveBeenCalledTimes(4)
+  })
+})

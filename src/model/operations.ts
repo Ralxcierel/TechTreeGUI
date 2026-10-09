@@ -1,6 +1,6 @@
 // Immutable graph operations: each returns a new document and never mutates its input.
 import { newEdgeId, newNodeId } from './ids'
-import type { GraphDocument, GraphEdge, GraphNode, Position, Viewport } from './types'
+import type { GraphDocument, GraphEdge, GraphNode, NodeStyle, Position, Viewport } from './types'
 
 /** Adds a node of `typeId`, filling its data from the type's field defaults. */
 export function addNode(
@@ -54,6 +54,59 @@ export function updateNodeData(
     return { ...n, data }
   })
   return changed ? { ...doc, nodes } : doc
+}
+
+/** Removes one key from a node's `data`. Returns `doc` itself if the node or key isn't there. */
+export function removeNodeData(doc: GraphDocument, nodeId: string, key: string): GraphDocument {
+  let changed = false
+  const nodes = doc.nodes.map((n) => {
+    if (n.id !== nodeId || !Object.hasOwn(n.data, key)) return n
+    changed = true
+    const data = { ...n.data }
+    delete data[key]
+    return { ...n, data }
+  })
+  return changed ? { ...doc, nodes } : doc
+}
+
+/**
+ * Sets one style override on a node, or removes it when `value` is undefined (the node then uses
+ * its type's value again). Returns `doc` itself if nothing changes.
+ */
+export function setStyleOverride<K extends keyof NodeStyle>(
+  doc: GraphDocument,
+  nodeId: string,
+  key: K,
+  value: NodeStyle[K] | undefined,
+): GraphDocument {
+  let changed = false
+  const nodes = doc.nodes.map((n) => {
+    if (n.id !== nodeId) return n
+    const has = Object.hasOwn(n.styleOverrides, key)
+    if (value === undefined ? !has : has && Object.is(n.styleOverrides[key], value)) return n
+    changed = true
+    const styleOverrides = { ...n.styleOverrides }
+    if (value === undefined) delete styleOverrides[key]
+    else styleOverrides[key] = value
+    return { ...n, styleOverrides }
+  })
+  return changed ? { ...doc, nodes } : doc
+}
+
+/** Changes an edge's type, unless that would break the edge rules (S7) or the type is unknown. */
+export function setEdgeType(doc: GraphDocument, edgeId: string, typeId: string): ConnectResult {
+  const edge = doc.edges.find((e) => e.id === edgeId)
+  if (!edge) return { ok: false, error: `Unknown edge: ${edgeId}` }
+  if (edge.typeId === typeId) return { ok: true, doc, edge }
+  const others = { ...doc, edges: doc.edges.filter((e) => e.id !== edgeId) }
+  const error = connectionError(others, { ...edge, typeId })
+  if (error) return { ok: false, error }
+  const updated = { ...edge, typeId }
+  return {
+    ok: true,
+    doc: { ...doc, edges: doc.edges.map((e) => (e.id === edgeId ? updated : e)) },
+    edge: updated,
+  }
 }
 
 /** Moves nodes to new positions. Unknown ids are ignored. Returns `doc` itself if nothing moved. */

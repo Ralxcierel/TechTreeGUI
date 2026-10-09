@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDef, NodeType } from '../model'
-import { cardLines, EMPTY, formatValue } from './cardDisplay'
+import { cardLines, EMPTY, expandedLines, formatValue, tooltipLines } from './cardDisplay'
 
 describe('formatValue', () => {
   it.each([
@@ -85,5 +85,126 @@ describe('cardLines', () => {
   it('reads only own data keys (no inherited properties)', () => {
     const t = type([field('toString', 'text')])
     expect(cardLines(t, {})[0]?.text).toBe(EMPTY)
+  })
+})
+
+describe('tooltipLines', () => {
+  const field = (key: string, kind: FieldDef['kind'], show: FieldDef['show']) =>
+    ({ key, label: key.toUpperCase(), kind, show }) as FieldDef
+  const type = (fields: FieldDef[]): NodeType => ({
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields,
+  })
+
+  it('lists only fields marked tooltip, in order, labelled, with lists in full', () => {
+    const t = type([
+      field('title', 'text', ['card']),
+      field('cost', 'number', ['card', 'tooltip']),
+      field('tags', 'list', ['tooltip']),
+      field('done', 'boolean', ['tooltip']),
+    ])
+    const lines = tooltipLines(t, { title: 'Fire', cost: 5, tags: ['a', 'b', 'c', 'd'] })
+    expect(lines.map((l) => [l.key, l.label, l.text])).toEqual([
+      ['cost', 'COST', '5'],
+      ['tags', 'TAGS', 'a, b, c, d'],
+      ['done', 'DONE', EMPTY],
+    ])
+  })
+
+  it('is empty when no field is marked tooltip', () => {
+    expect(tooltipLines(type([field('title', 'text', ['card'])]), {})).toEqual([])
+  })
+})
+
+describe('cardLines: enum dropdowns', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      {
+        key: 'branch',
+        label: 'Branch',
+        kind: 'enum',
+        options: ['Industry', 'Science'],
+        show: ['card'],
+      },
+    ],
+  }
+  const branch = (values: Record<string, unknown>) => cardLines(type, values)[1]!
+
+  it('offers the choices with the current value', () => {
+    expect(branch({ branch: 'Science' })).toMatchObject({
+      choices: ['Industry', 'Science'],
+      choice: 'Science',
+    })
+  })
+
+  it('offers the choices with nothing chosen when the value is not set', () => {
+    const line = branch({})
+    expect(line.choices).toEqual(['Industry', 'Science'])
+    expect(line).not.toHaveProperty('choice')
+  })
+
+  it('keeps a value that is not a choice as read-only text', () => {
+    for (const value of ['Magic', 3, null]) {
+      const line = branch({ branch: value })
+      expect(line).not.toHaveProperty('choices')
+      expect(line.editable).toBe(false)
+    }
+  })
+})
+
+describe('expandedLines', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      { key: 'details', label: 'Details', kind: 'richtext', show: ['expanded'] },
+      { key: 'cost', label: 'Cost', kind: 'number', show: ['tooltip'] },
+      { key: 'tags', label: 'Tags', kind: 'list', show: ['card', 'expanded'] },
+    ],
+  }
+
+  it('lists only fields marked expanded, in order, with lists in full', () => {
+    const lines = expandedLines(type, { details: 'a\nb', tags: ['1', '2', '3', '4'] })
+    expect(lines.map((l) => [l.key, l.text])).toEqual([
+      ['details', 'a\nb'],
+      ['tags', '1, 2, 3, 4'],
+    ])
+  })
+})
+
+describe('pictures in card, tooltip and expanded lines', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      { key: 'art', label: 'Art', kind: 'image', show: ['card', 'tooltip', 'expanded'] },
+      { key: 'url', label: 'Link', kind: 'text', show: ['card'] },
+    ],
+  }
+
+  it('gives image fields holding a picture address an imageUrl, everywhere', () => {
+    const values = { art: ' https://x/a.png ', url: 'https://x/b.png' }
+    expect(cardLines(type, values)[1]!.imageUrl).toBe('https://x/a.png')
+    expect(tooltipLines(type, values)[0]!.imageUrl).toBe('https://x/a.png')
+    expect(expandedLines(type, values)[0]!.imageUrl).toBe('https://x/a.png')
+    // A text field holding an address stays text.
+    expect(cardLines(type, values)[2]).not.toHaveProperty('imageUrl')
+  })
+
+  it('leaves other values as text', () => {
+    for (const art of ['file:///a.png', 'not a url', 42, null, undefined]) {
+      expect(cardLines(type, { art })[1]).not.toHaveProperty('imageUrl')
+      expect(tooltipLines(type, { art })[0]).not.toHaveProperty('imageUrl')
+    }
   })
 })

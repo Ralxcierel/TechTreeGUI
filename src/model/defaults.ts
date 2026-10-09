@@ -1,9 +1,9 @@
 import { newDocumentTypes, STARTER_EDGE_TYPES, STARTER_NODE_TYPES } from './starters'
 import { CURRENT_SCHEMA_VERSION, type EdgeType, type GraphDocument, type NodeType } from './types'
 
-/** The node type "Add node" uses until a type can be picked (DESIGN Phase 2, P2-5). */
+/** The starter node type `defaultNodeType()` copies (also the style new node types start with). */
 export const DEFAULT_NODE_TYPE_ID = 'technology'
-/** The edge type new connections use until a type can be picked (P2-4). */
+/** The starter edge type `defaultEdgeType()` copies (also the style new edge types start with). */
 export const DEFAULT_EDGE_TYPE_ID = 'prereq'
 
 function starter<T>(list: readonly { id: string; create: () => T }[], id: string): T {
