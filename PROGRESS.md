@@ -2,16 +2,16 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (updated 2026-10-08, at the Phase 2 gate)
+## Resume here (updated 2026-10-08)
 1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (365 tests at hand-off).
-2. Waiting on the developer: approve the **DESIGN Phase 2 gate** (P2-6), and decide whether to open a PR `phase2` → `main` (P2-3 to P2-6 aren't on `main` yet).
-3. After approval: plan **DESIGN Phase 3** (see `docs/DESIGN.md` §5 and the Phase 3 notes in `docs/PLAN-phase2.md` §5) with the walking-skeleton method, and stop for approval of that plan before building.
-4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times, including during P2-5).
+2. Waiting on the developer: approve the **DESIGN Phase 3 plan** (`docs/PLAN-phase3.md`), including decisions D1–D8, and answer Q1–Q3.
+3. After approval: build **P3-0 (tooltips skeleton)**. Phase 3 work continues on branch `phase2` unless the developer says otherwise.
+4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times).
 
 ## Where we are
-- **DESIGN Phase 2 is complete and at its gate (P2-6), waiting for the developer's approval.** P2-0 to P2-5 were approved (P2-5 on 2026-10-08, together with option (a) for enum choices, which was then built).
-- `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). P2-3 to P2-6 are only on `phase2`.
-- The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12.
+- **DESIGN Phase 2 is complete and approved (2026-10-08).**
+- **DESIGN Phase 3 is planned** in `docs/PLAN-phase3.md` (draft): tooltips, on-card dropdowns, expandable sections, pictures and icons, named handles (schema v3). Nothing is built yet.
+- **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2; everything after is only on `phase2`.
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
