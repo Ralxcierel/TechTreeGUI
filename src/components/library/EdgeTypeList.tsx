@@ -1,7 +1,9 @@
 // The Library's edge types: pick the one new connections use, open one for editing, or add one.
-import { useId, useState } from 'react'
+import { useMemo } from 'react'
 import { activeEdgeTypeId, useEditorStore } from '../../editor/store'
+import { STARTER_EDGE_TYPES } from '../../model'
 import { EdgeSwatch } from './EdgeSwatch'
+import { TypeList } from './TypeList'
 
 export function EdgeTypeList() {
   const edgeTypes = useEditorStore((s) => s.doc.edgeTypes)
@@ -11,83 +13,37 @@ export function EdgeTypeList() {
   const setActive = useEditorStore((s) => s.setActiveEdgeType)
   const edit = useEditorStore((s) => s.editEdgeType)
   const create = useEditorStore((s) => s.createEdgeType)
-  const [name, setName] = useState('')
-  const nameId = useId()
-  const radioName = useId()
-  const hintId = useId()
+  const addStarter = useEditorStore((s) => s.addStarterType)
 
-  const usage = (typeId: string) => edges.filter((e) => e.typeId === typeId).length
-  const add = () => {
-    const trimmed = name.trim()
-    if (trimmed === '') return
-    create(trimmed)
-    setName('')
-  }
+  const items = useMemo(
+    () =>
+      edgeTypes.map((t) => ({
+        id: t.id,
+        name: t.name,
+        count: edges.filter((e) => e.typeId === t.id).length,
+        swatch: <EdgeSwatch style={t.style} />,
+      })),
+    [edgeTypes, edges],
+  )
+  const starters = STARTER_EDGE_TYPES.filter((s) => !edgeTypes.some((t) => t.id === s.id)).map(
+    (s) => ({ id: s.id, name: s.create().name }),
+  )
 
   return (
-    <section aria-label="Edge types">
-      <h2 className="library__heading">Edge types</h2>
-      {edgeTypes.length === 0 ? (
-        <p className="library__hint">No edge types. Add one to connect nodes.</p>
-      ) : (
-        <p className="library__hint" id={hintId}>
-          The selected one is used for new connections.
-        </p>
-      )}
-      {/* The radios form one group; the list keeps its own list semantics inside it. */}
-      <div role="radiogroup" aria-labelledby={edgeTypes.length > 0 ? hintId : undefined}>
-        <ul className="library__list">
-          {edgeTypes.map((t) => (
-            <li
-              key={t.id}
-              className={
-                t.id === editingId ? 'library__item library__item--editing' : 'library__item'
-              }
-            >
-              <input
-                type="radio"
-                name={radioName}
-                checked={t.id === active}
-                onChange={() => setActive(t.id)}
-                aria-label={`Use ${t.name.trim() || t.id} for new connections`}
-              />
-              <button
-                type="button"
-                className="library__open"
-                onClick={() => edit(t.id)}
-                aria-label={`Edit edge type ${t.name.trim() || t.id}, used by ${usage(t.id)}`}
-              >
-                <EdgeSwatch style={t.style} />
-                <span className="library__name">{t.name.trim() || <em>(unnamed)</em>}</span>
-                <span className="library__count" title="Edges of this type">
-                  {usage(t.id)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <form
-        className="library__add"
-        onSubmit={(e) => {
-          e.preventDefault()
-          add()
-        }}
-      >
-        <label className="visually-hidden" htmlFor={nameId}>
-          New edge type name
-        </label>
-        <input
-          id={nameId}
-          type="text"
-          value={name}
-          placeholder="New edge type…"
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button type="submit" disabled={name.trim() === ''}>
-          Add
-        </button>
-      </form>
-    </section>
+    <TypeList
+      title="Edge types"
+      noun="edge type"
+      usedFor="new connections"
+      emptyHint="No edge types. Add one to connect nodes."
+      countTitle="Edges of this type"
+      items={items}
+      activeId={active}
+      editingId={editingId}
+      onActivate={setActive}
+      onEdit={edit}
+      onCreate={create}
+      starters={starters}
+      onAddStarter={(id) => addStarter('edge', id)}
+    />
   )
 }

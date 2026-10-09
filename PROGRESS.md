@@ -3,16 +3,16 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Resume here (updated 2026-10-08, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (312 tests at hand-off).
-2. Waiting on the developer: review and approve **P2-4** at the gate, and confirm the P2-4 [DECISION]s listed under Open items.
-3. After approval, start **P2-5 (node types)**. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
-4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times).
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (363 tests at hand-off).
+2. Waiting on the developer: review and approve **P2-5** at the gate, and answer the open **[QUESTION]** about editing enum choices (see Open items).
+3. After approval, start **P2-6 (Phase 2 gate)**: the automated "done when" test from `docs/PLAN-phase2.md` §1, a hand check in the browser with a radial layout screenshot, and a `PROGRESS.md` update.
+4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times, including during P2-5).
 
 ## Where we are
-- **DESIGN Phase 2, increment P2-4 (edge types) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-3 were approved (P2-3 on 2026-10-08, along with the list-values tightening).
-- `main` already has Phase 1 and P2-0 to P2-2 (PRs #1 and #2 were merged by the developer). P2-3 and P2-4 are only on `phase2`.
+- **DESIGN Phase 2, increment P2-5 (node types) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-4 were approved (P2-4 on 2026-10-08, with all its decisions).
+- `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). P2-3 to P2-5 are only on `phase2`.
 - The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12.
-- Next: **P2-5, node types**: Library list of node types; create, edit and delete them (name, style); a field-list editor (add, remove, reorder; key, label, kind, options, default, where shown); the active node type is used by **Add node**. D9 governs field edits on types in use.
+- Next: **P2-6, the Phase 2 gate.**
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -67,6 +67,15 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - 312 tests. In the browser with real input: created "Unlocks", set it dashed, straight and amber, drew a connection (it came out amber, dashed, straight), switched the active type to Prerequisite and drew another (grey curve), saw Delete blocked with "1 edge uses this type", and selecting a node closed the type editor.
   - Independent review, 3 rounds, no bugs. Round 1: blank names in the edge dropdown, a delete check that ignored `editing.kind`, the stale active pick after delete, arrow size in the swatch, accessibility labels. Round 2: width step (whole widths were invalid with min 0.5), trailing-dot dashes, whitespace-only names, radiogroup semantics. Round 3: dash separators the browser rejects (`8,,3`) and all-zero dashes, untrimmed meaning, a fallback test that couldn't fail. All fixed; round 3's fixes were tested but not re-reviewed (3-round cap).
 
+- **P2-5 node types:**
+  - Model `src/model/nodeTypes.ts`: `createNodeType` (Technology style plus a `title` text field, default "New <name>"), `updateNodeType`, `deleteNodeType` (blocked while in use, D8), `nodeTypeUsage`, and field operations `addField` (fresh key that also avoids data left on nodes), `updateField` (label, kind, choices, placements; drops a default that no longer fits; enum gets "Option 1"; leaving enum drops choices), `setFieldDefault` (must fit), `renameFieldKey` (moves values in every node of the type, D9; refuses blank, taken or clashing keys), `removeField` (node values kept → Other data), `moveField`.
+  - Store: `activeNodeTypeId` (D11), used by **Add node** (the toolbar shows a message when there are no node types); node type and field actions; `addStarterType` re-adds built-in types.
+  - Library: a shared `TypeList` now draws both sections (node types with a shape swatch, edge types with a line sample). Each has an "Add built-in…" select for missing starter types.
+  - `NodeTypeInspector`: name, look (shape, width, fill, border), the field list (`FieldDefEditor` per field: label, key, kind, choices, default with "No default", where it shows, ↑/↓, Remove), Add field, Delete. Key edits save on Enter or leaving the box; Escape reverts. Kind changes that would lose choices or the default ask first. A renamed field keeps its editor, so focus and clicks survive.
+  - `FieldValueInput` (the per-kind input) was split out of `FieldEditor` and is reused for defaults. `ListInput` now shows the saved list again when you leave it.
+  - 363 tests. In the browser with real input: created "Wonder", made it a circle, added a field, made it a choice with Ancient/Classical/Modern, set the default to Classical, renamed its key to `age` with Enter, then **Add node** made a Wonder circle reading "New Wonder / Age: Classical".
+  - Independent review, 3 rounds. Round 1 (no bugs): renaming a key remounted the field editor (focus and clicks lost), missing Library and toolbar tests, plus nits. Round 2 found **a bug**: typing a default lost focus after one letter. Also Choices and Default still remounted on a rename. Round 3 (no bugs): a test that couldn't fail, a stale alias after removing a renamed field, a stale key error. All fixed; round 3's fixes were tested but not re-reviewed (3-round cap). One round-3 finding is left open as a [QUESTION] below.
+
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
 - **Increment 1:** drag, select and delete nodes (edges cascade, S8). Background, Controls, and a MiniMap colored by node type. The viewport is saved and restored (S9). Node objects keep identity and measured sizes, so nothing flickers.
@@ -96,10 +105,12 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
-- **[DECISION]** (P2-4, awaiting confirmation) Clicking a type in the Library opens it in the inspector and clears the canvas selection; selecting anything on the canvas closes it again; a Done button closes it too.
-- **[DECISION]** (P2-4) A new edge type is created from a name (so its id reads well, D10), starts with the Prerequisite look, becomes the active type and opens for editing.
-- **[DECISION]** (P2-4) The last edge type may be deleted if no edge uses it; connecting is then refused and the Library says to add one.
-- **[DECISION]** (P2-4) Dash is picked from presets (Solid, Dashed `6 4`, Dotted `2 4`, Long dash `12 6`) or typed as a custom pattern; only patterns the browser can draw are saved. Width is at least 0.5, in steps of 0.5.
+- **[QUESTION]** (P2-5, from review round 3) Choices save on every keystroke, and a default that stops matching a choice is dropped right away, without asking. Example: choices "Low / High", default "High"; editing that line to "Highest" drops the default at "Highe", and it doesn't come back. Options: (a) save choices when leaving the box, and ask if the default would be lost (recommended); (b) keep as is; (c) keep the default while typing and only drop it when leaving the box.
+- **[DECISION]** (P2-5, accepted in advance by the developer's "accept all your recommendations") New node types start with the Technology look and a `title` text field; key edits save on Enter or leaving the box; a key rename is refused if any node of the type already has data under the new key; kind changes drop a default that doesn't fit (asking first); enum starts with "Option 1"; reorder with ↑/↓; "Add built-in…" re-adds starter types; the active type is used for "new nodes" (radio wording).
+- **[DECISION]** (P2-4, approved 2026-10-08) Clicking a type in the Library opens it in the inspector and clears the canvas selection; selecting anything on the canvas closes it again; a Done button closes it too.
+- **[DECISION]** (P2-4, approved) A new edge type is created from a name (so its id reads well, D10), starts with the Prerequisite look, becomes the active type and opens for editing.
+- **[DECISION]** (P2-4, approved) The last edge type may be deleted if no edge uses it; connecting is then refused and the Library says to add one.
+- **[DECISION]** (P2-4, approved) Dash is picked from presets (Solid, Dashed `6 4`, Dotted `2 4`, Long dash `12 6`) or typed as a custom pattern; only patterns the browser can draw are saved. Width is at least 0.5, in steps of 0.5.
 - **[ASSUMPTION]** (P2-4) An empty Meaning is stored as `null`; a name may be blank (the Library shows "(unnamed)" and falls back to the id elsewhere).
 - Resolved 2026-10-08: the P2-3 list-values tightening was accepted.
 - Resolved: a PR for `phase1-skeleton` → `main` was requested (the developer opens it, see above). RTL + jsdom were added.

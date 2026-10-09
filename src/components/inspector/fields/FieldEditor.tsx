@@ -2,9 +2,8 @@
 import { useId } from 'react'
 import { useEditorStore } from '../../../editor/store'
 import { fieldValueProblem, type FieldDef } from '../../../model'
-import { ListInput } from './ListInput'
+import { FieldValueInput } from './FieldValueInput'
 import { MismatchedValue } from './MismatchedValue'
-import { NumberInput } from './NumberInput'
 
 interface FieldEditorProps {
   nodeId: string
@@ -21,72 +20,11 @@ export function FieldEditor({ nodeId, field, value }: FieldEditorProps) {
 
   const problem = value === undefined ? null : fieldValueProblem(field.kind, value, field.options)
 
-  let control
-  if (problem) {
-    control = <MismatchedValue labelledBy={id} value={value} problem={problem} onClear={clear} />
-  } else {
-    switch (field.kind) {
-      case 'text':
-      case 'image':
-        control = (
-          <input
-            id={id}
-            type="text"
-            value={(value as string | null | undefined) ?? ''}
-            placeholder={field.kind === 'image' ? 'Image URL' : undefined}
-            // An emptied image field means "no image": remove the value.
-            onChange={(e) =>
-              field.kind === 'image' && e.target.value === '' ? clear() : set(e.target.value)
-            }
-          />
-        )
-        break
-      case 'richtext':
-        control = (
-          <textarea
-            id={id}
-            rows={4}
-            value={(value as string | undefined) ?? ''}
-            onChange={(e) => set(e.target.value)}
-          />
-        )
-        break
-      case 'number':
-        control = (
-          <NumberInput id={id} value={value as number | undefined} onChange={set} onClear={clear} />
-        )
-        break
-      case 'enum':
-        control = (
-          <select
-            id={id}
-            value={(value as string | undefined) ?? ''}
-            onChange={(e) => (e.target.value === '' ? clear() : set(e.target.value))}
-          >
-            <option value="">—</option>
-            {(field.options ?? []).map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        )
-        break
-      case 'boolean':
-        control = (
-          <input
-            id={id}
-            type="checkbox"
-            checked={value === true}
-            onChange={(e) => set(e.target.checked)}
-          />
-        )
-        break
-      case 'list':
-        control = <ListInput id={id} value={value as string[] | undefined} onChange={set} />
-        break
-    }
-  }
+  const control = problem ? (
+    <MismatchedValue labelledBy={id} value={value} problem={problem} onClear={clear} />
+  ) : (
+    <FieldValueInput id={id} field={field} value={value} onSet={set} onClear={clear} />
+  )
 
   return (
     <div className={`inspector__row inspector__row--${field.kind}`}>

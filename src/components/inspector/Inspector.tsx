@@ -4,6 +4,7 @@ import { useEditorStore } from '../../editor/store'
 import { DocumentInspector } from './DocumentInspector'
 import { EdgeInspector } from './EdgeInspector'
 import { EdgeTypeInspector } from './EdgeTypeInspector'
+import { NodeTypeInspector } from './NodeTypeInspector'
 import { NodeInspector } from './NodeInspector'
 
 function plural(n: number, word: string): string {
@@ -19,12 +20,19 @@ export function Inspector() {
       ? s.editing.id
       : null,
   )
+  const editingNodeType = useEditorStore((s) =>
+    s.editing?.kind === 'nodeType' && s.doc.nodeTypes.some((t) => t.id === s.editing?.id)
+      ? s.editing.id
+      : null,
+  )
   const nodes = selectedNodeIds.size
   const edges = selectedEdgeIds.size
 
   let content
   if (editingEdgeType !== null) {
     content = <EdgeTypeInspector key={editingEdgeType} typeId={editingEdgeType} />
+  } else if (editingNodeType !== null) {
+    content = <NodeTypeInspector key={editingNodeType} typeId={editingNodeType} />
   } else if (nodes === 0 && edges === 0) {
     content = <DocumentInspector />
   } else if (nodes === 1 && edges === 0) {

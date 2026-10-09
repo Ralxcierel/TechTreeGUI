@@ -18,6 +18,8 @@ export function ListInput({ id, value, onChange }: ListInputProps) {
       rows={4}
       value={draft}
       placeholder="One item per line"
+      // Leaving the box shows what was saved (e.g. after an emptied list of choices was refused).
+      onBlur={() => setDraft((value ?? []).join('\n'))}
       onChange={(e) => {
         setDraft(e.target.value)
         onChange(

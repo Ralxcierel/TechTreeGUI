@@ -3,22 +3,36 @@
 import type { Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react'
 import { create } from 'zustand'
 import {
+  addField,
   addNode,
+  addStarterEdgeType,
+  addStarterNodeType,
   connect,
   connectionError,
   createEdgeType,
   createEmptyDocument,
+  createNodeType,
   deleteEdgeType,
+  deleteNodeType,
+  moveField,
+  removeField,
   removeNodeData,
   renameDocument,
+  renameFieldKey,
+  setFieldDefault,
   setEdgeType,
   setStyleOverride,
   setViewport,
   updateEdgeType,
+  updateField,
   updateNodeData,
+  updateNodeType,
   withModified,
   type EdgeEnds,
   type EdgeTypePatch,
+  type FieldPatch,
+  type NodeTypePatch,
+  type TypeOpResult,
   type GraphDocument,
   type NodeStyle,
   type Position,
@@ -36,7 +50,7 @@ import {
 } from './flowAdapter'
 
 /** A type opened in the inspector from the Library (instead of the canvas selection). */
-export type Editing = { kind: 'edgeType'; id: string }
+export type Editing = { kind: 'edgeType' | 'nodeType'; id: string }
 
 interface EditorState {
   doc: GraphDocument
@@ -53,6 +67,8 @@ interface EditorState {
    * exists; read it through `activeEdgeTypeId(state)`, which falls back to the first type.
    */
   activeEdgeTypeId: string | null
+  /** The node type "Add node" uses (editor-only, D11); read it through `activeNodeTypeId(state)`. */
+  activeNodeTypeId: string | null
   /** The type shown in the inspector, or null to show the canvas selection. */
   editing: Editing | null
   addNode: (typeId: string, position: Position) => void
@@ -71,6 +87,27 @@ interface EditorState {
   updateEdgeType: (typeId: string, patch: EdgeTypePatch) => void
   /** Deletes an edge type. Returns why not (e.g. edges still use it), or null when it worked. */
   deleteEdgeType: (typeId: string) => string | null
+  /** Picks the node type "Add node" uses. */
+  setActiveNodeType: (typeId: string) => void
+  /** Opens a node type in the inspector (clearing the canvas selection), or closes it with null. */
+  editNodeType: (typeId: string | null) => void
+  /** Adds a node type, makes it active and opens it in the inspector. Returns its id. */
+  createNodeType: (name: string) => string
+  updateNodeType: (typeId: string, patch: NodeTypePatch) => void
+  /** Deletes a node type. Returns why not (e.g. nodes still use it), or null when it worked. */
+  deleteNodeType: (typeId: string) => string | null
+  /** Adds a text field to a node type. Returns its key. */
+  addField: (typeId: string) => string
+  /** The field actions below return why a change was refused, or null when it worked. */
+  updateField: (typeId: string, key: string, patch: FieldPatch) => string | null
+  /** Sets the value new nodes start with; `undefined` removes it. */
+  setFieldDefault: (typeId: string, key: string, value: unknown) => string | null
+  /** Renames a field key, moving the value in every node of the type (D9). */
+  renameFieldKey: (typeId: string, oldKey: string, newKey: string) => string | null
+  removeField: (typeId: string, key: string) => void
+  moveField: (typeId: string, key: string, by: -1 | 1) => void
+  /** Adds a built-in starter type the document doesn't have. Returns why not, or null. */
+  addStarterType: (kind: 'node' | 'edge', starterId: string) => string | null
   /** Sets one value in a node's data, e.g. its title. */
   setNodeField: (nodeId: string, key: string, value: unknown) => void
   /** Removes one value from a node's data (the card then shows "—"). */
@@ -113,6 +150,15 @@ export function activeEdgeTypeId(s: Pick<EditorState, 'doc' | 'activeEdgeTypeId'
   return types[0]?.id ?? null
 }
 
+/** The node type "Add node" uses: the picked one if it still exists, else the first one. */
+export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'>): string | null {
+  const types = s.doc.nodeTypes
+  if (s.activeNodeTypeId !== null && types.some((t) => t.id === s.activeNodeTypeId)) {
+    return s.activeNodeTypeId
+  }
+  return types[0]?.id ?? null
+}
+
 /** Selecting something on the canvas closes a type opened from the Library. */
 function closeEditingOnSelect(
   editing: Editing | null,
@@ -139,92 +185,145 @@ function toEnds(c: Connection | Edge, typeId: string): EdgeEnds {
   }
 }
 
+/** Opens a type in the inspector and clears the canvas selection, or closes it with null. */
+function openType(s: EditorState, editing: Editing | null): Partial<EditorState> {
+  if (!editing) return { editing: null }
+  const ui = { ...s.ui, selectedNodeIds: new Set<string>(), selectedEdgeIds: new Set<string>() }
+  return { ...derive(s, s.doc, ui), editing }
+}
+
 const initialDoc = createEmptyDocument()
 
-export const useEditorStore = create<EditorState>()((set, get) => ({
-  doc: initialDoc,
-  savedDoc: initialDoc,
-  ui: emptyUi(),
-  flowNodes: [],
-  activeEdgeTypeId: null,
-  editing: null,
-  addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
-  onNodesChange: (changes) =>
-    set((s) => {
-      const next = reduceNodeChanges(s.doc, s.ui, changes)
-      return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
-    }),
-  onEdgesChange: (changes) =>
-    set((s) => {
-      const next = reduceEdgeChanges(s.doc, s.ui, changes)
-      return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
-    }),
-  isValidConnection: (connection) => {
-    const typeId = activeEdgeTypeId(get())
-    return typeId !== null && connectionError(get().doc, toEnds(connection, typeId)) === null
-  },
-  connect: (connection) =>
-    set((s) => {
-      const typeId = activeEdgeTypeId(s)
-      if (typeId === null) return s
-      const result = connect(s.doc, toEnds(connection, typeId))
-      return result.ok ? derive(s, result.doc, s.ui) : s
-    }),
-  setActiveEdgeType: (typeId) => set({ activeEdgeTypeId: typeId }),
-  editEdgeType: (typeId) =>
-    set((s) => {
-      if (typeId === null) return { editing: null }
-      const ui = { ...s.ui, selectedNodeIds: new Set<string>(), selectedEdgeIds: new Set<string>() }
-      return { ...derive(s, s.doc, ui), editing: { kind: 'edgeType', id: typeId } }
-    }),
-  createEdgeType: (name) => {
-    const { doc, id } = createEdgeType(get().doc, name)
-    set((s) => derive(s, doc, s.ui))
-    get().setActiveEdgeType(id)
-    get().editEdgeType(id)
-    return id
-  },
-  updateEdgeType: (typeId, patch) =>
-    set((s) => derive(s, updateEdgeType(s.doc, typeId, patch), s.ui)),
-  deleteEdgeType: (typeId) => {
-    const result = deleteEdgeType(get().doc, typeId)
-    if (!result.ok) return result.error
-    set((s) => ({
-      ...derive(s, result.doc, s.ui),
-      editing: s.editing?.kind === 'edgeType' && s.editing.id === typeId ? null : s.editing,
-      activeEdgeTypeId: s.activeEdgeTypeId === typeId ? null : s.activeEdgeTypeId,
-    }))
-    return null
-  },
-  setNodeField: (nodeId, key, value) =>
-    set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
-  removeNodeField: (nodeId, key) => set((s) => derive(s, removeNodeData(s.doc, nodeId, key), s.ui)),
-  setNodeStyleOverride: (nodeId, key, value) =>
-    set((s) => derive(s, setStyleOverride(s.doc, nodeId, key, value), s.ui)),
-  setEdgeType: (edgeId, typeId) => {
-    const result = setEdgeType(get().doc, edgeId, typeId)
+export const useEditorStore = create<EditorState>()((set, get) => {
+  /** Applies a model result that may be refused; returns the reason, or null when it worked. */
+  const apply = (result: TypeOpResult): string | null => {
     if (!result.ok) return result.error
     set((s) => derive(s, result.doc, s.ui))
     return null
-  },
-  setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
-  loadDocument: (doc) =>
-    set((s) => {
-      const ui = uiForLoadedDocument(doc, s.doc, s.ui)
-      return {
-        doc,
-        savedDoc: doc,
-        ui,
-        flowNodes: toFlowNodes(doc, ui),
-        activeEdgeTypeId: null,
-        editing: null,
-      }
-    }),
-  newDocument: () => get().loadDocument(createEmptyDocument()),
-  hasUnsavedChanges: () => get().doc !== get().savedDoc,
-  markSaved: (viewport) => {
-    const doc = withModified(setViewport(get().doc, viewport))
-    set((s) => ({ ...derive(s, doc, s.ui), savedDoc: doc }))
-    return doc
-  },
-}))
+  }
+  return {
+    doc: initialDoc,
+    savedDoc: initialDoc,
+    ui: emptyUi(),
+    flowNodes: [],
+    activeEdgeTypeId: null,
+    activeNodeTypeId: null,
+    editing: null,
+    addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
+    onNodesChange: (changes) =>
+      set((s) => {
+        const next = reduceNodeChanges(s.doc, s.ui, changes)
+        return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
+      }),
+    onEdgesChange: (changes) =>
+      set((s) => {
+        const next = reduceEdgeChanges(s.doc, s.ui, changes)
+        return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
+      }),
+    isValidConnection: (connection) => {
+      const typeId = activeEdgeTypeId(get())
+      return typeId !== null && connectionError(get().doc, toEnds(connection, typeId)) === null
+    },
+    connect: (connection) =>
+      set((s) => {
+        const typeId = activeEdgeTypeId(s)
+        if (typeId === null) return s
+        const result = connect(s.doc, toEnds(connection, typeId))
+        return result.ok ? derive(s, result.doc, s.ui) : s
+      }),
+    setActiveEdgeType: (typeId) => set({ activeEdgeTypeId: typeId }),
+    editEdgeType: (typeId) =>
+      set((s) => openType(s, typeId === null ? null : { kind: 'edgeType', id: typeId })),
+    createEdgeType: (name) => {
+      const { doc, id } = createEdgeType(get().doc, name)
+      set((s) => derive(s, doc, s.ui))
+      get().setActiveEdgeType(id)
+      get().editEdgeType(id)
+      return id
+    },
+    updateEdgeType: (typeId, patch) =>
+      set((s) => derive(s, updateEdgeType(s.doc, typeId, patch), s.ui)),
+    deleteEdgeType: (typeId) => {
+      const result = deleteEdgeType(get().doc, typeId)
+      if (!result.ok) return result.error
+      set((s) => ({
+        ...derive(s, result.doc, s.ui),
+        editing: s.editing?.kind === 'edgeType' && s.editing.id === typeId ? null : s.editing,
+        activeEdgeTypeId: s.activeEdgeTypeId === typeId ? null : s.activeEdgeTypeId,
+      }))
+      return null
+    },
+    setActiveNodeType: (typeId) => set({ activeNodeTypeId: typeId }),
+    editNodeType: (typeId) =>
+      set((s) => openType(s, typeId === null ? null : { kind: 'nodeType', id: typeId })),
+    createNodeType: (name) => {
+      const { doc, id } = createNodeType(get().doc, name)
+      set((s) => derive(s, doc, s.ui))
+      get().setActiveNodeType(id)
+      get().editNodeType(id)
+      return id
+    },
+    updateNodeType: (typeId, patch) =>
+      set((s) => derive(s, updateNodeType(s.doc, typeId, patch), s.ui)),
+    deleteNodeType: (typeId) => {
+      const result = deleteNodeType(get().doc, typeId)
+      if (!result.ok) return result.error
+      set((s) => ({
+        ...derive(s, result.doc, s.ui),
+        editing: s.editing?.kind === 'nodeType' && s.editing.id === typeId ? null : s.editing,
+        activeNodeTypeId: s.activeNodeTypeId === typeId ? null : s.activeNodeTypeId,
+      }))
+      return null
+    },
+    addField: (typeId) => {
+      const { doc, key } = addField(get().doc, typeId)
+      set((s) => derive(s, doc, s.ui))
+      return key
+    },
+    updateField: (typeId, key, patch) => apply(updateField(get().doc, typeId, key, patch)),
+    setFieldDefault: (typeId, key, value) => apply(setFieldDefault(get().doc, typeId, key, value)),
+    renameFieldKey: (typeId, oldKey, newKey) =>
+      apply(renameFieldKey(get().doc, typeId, oldKey, newKey)),
+    removeField: (typeId, key) => set((s) => derive(s, removeField(s.doc, typeId, key), s.ui)),
+    moveField: (typeId, key, by) => set((s) => derive(s, moveField(s.doc, typeId, key, by), s.ui)),
+    addStarterType: (kind, starterId) =>
+      apply(
+        kind === 'node'
+          ? addStarterNodeType(get().doc, starterId)
+          : addStarterEdgeType(get().doc, starterId),
+      ),
+    setNodeField: (nodeId, key, value) =>
+      set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
+    removeNodeField: (nodeId, key) =>
+      set((s) => derive(s, removeNodeData(s.doc, nodeId, key), s.ui)),
+    setNodeStyleOverride: (nodeId, key, value) =>
+      set((s) => derive(s, setStyleOverride(s.doc, nodeId, key, value), s.ui)),
+    setEdgeType: (edgeId, typeId) => {
+      const result = setEdgeType(get().doc, edgeId, typeId)
+      if (!result.ok) return result.error
+      set((s) => derive(s, result.doc, s.ui))
+      return null
+    },
+    setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
+    loadDocument: (doc) =>
+      set((s) => {
+        const ui = uiForLoadedDocument(doc, s.doc, s.ui)
+        return {
+          doc,
+          savedDoc: doc,
+          ui,
+          flowNodes: toFlowNodes(doc, ui),
+          activeEdgeTypeId: null,
+          activeNodeTypeId: null,
+          editing: null,
+        }
+      }),
+    newDocument: () => get().loadDocument(createEmptyDocument()),
+    hasUnsavedChanges: () => get().doc !== get().savedDoc,
+    markSaved: (viewport) => {
+      const doc = withModified(setViewport(get().doc, viewport))
+      set((s) => ({ ...derive(s, doc, s.ui), savedDoc: doc }))
+      return doc
+    },
+  }
+})

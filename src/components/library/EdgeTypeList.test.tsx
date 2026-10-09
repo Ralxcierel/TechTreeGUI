@@ -72,3 +72,18 @@ describe('EdgeTypeList', () => {
     expect(screen.getByText(/No edge types/)).toBeTruthy()
   })
 })
+
+describe('built-in types', () => {
+  it('offers missing starters only, and adds one', () => {
+    render(<EdgeTypeList />)
+    expect(screen.queryByLabelText('Add a built-in edge type')).toBeNull()
+    cleanup()
+    s().loadDocument({ ...s().doc, edges: [], edgeTypes: [] })
+    render(<EdgeTypeList />)
+    fireEvent.change(screen.getByLabelText('Add a built-in edge type'), {
+      target: { value: 'prereq' },
+    })
+    expect(s().doc.edgeTypes.map((t) => t.id)).toEqual(['prereq'])
+    expect(screen.queryByLabelText('Add a built-in edge type')).toBeNull()
+  })
+})

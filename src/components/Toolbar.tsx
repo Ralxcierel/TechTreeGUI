@@ -1,9 +1,9 @@
 import { useReactFlow, useStoreApi } from '@xyflow/react'
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useEditorStore } from '../editor/store'
+import { activeNodeTypeId, useEditorStore } from '../editor/store'
 import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
-import { DEFAULT_NODE_TYPE_ID, parseDocument, serialize } from '../model'
+import { parseDocument, serialize } from '../model'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
 
 const STACK_OFFSET = 24
@@ -16,19 +16,22 @@ export function Toolbar() {
 
   const handleAdd = () => {
     const { width, height, transform } = flowStore.getState()
-    const { doc, addNode } = useEditorStore.getState()
-    const nodeType = doc.nodeTypes.find((t) => t.id === DEFAULT_NODE_TYPE_ID)
+    const state = useEditorStore.getState()
+    const { doc, addNode } = state
+    // The type picked in the Library (or the first one).
+    const typeId = activeNodeTypeId(state)
+    const nodeType = doc.nodeTypes.find((t) => t.id === typeId)
     if (!nodeType) {
       setError({
         title: 'Cannot add a node.',
-        details: [`This document has no "${DEFAULT_NODE_TYPE_ID}" node type.`],
+        details: ['This document has no node types. Add one in the Library first.'],
       })
       return
     }
     const center = paneCenter(width, height, transform)
     // Offset successive nodes slightly so they don't land exactly on top of each other.
     const offset = (doc.nodes.length % 10) * STACK_OFFSET
-    addNode(DEFAULT_NODE_TYPE_ID, {
+    addNode(nodeType.id, {
       x: Math.round(center.x - nodeType.style.width / 2 + offset),
       y: Math.round(center.y + offset),
     })
