@@ -9,9 +9,9 @@ import {
   type FieldKind,
   type FieldPlacement,
 } from '../../model'
+import { ChoicesInput } from './ChoicesInput'
 import { FieldKeyInput } from './FieldKeyInput'
 import { FieldValueInput } from './fields/FieldValueInput'
-import { ListInput } from './fields/ListInput'
 import { LabeledInput } from './LabeledInput'
 
 const KINDS: readonly { value: FieldKind; label: string }[] = [
@@ -55,7 +55,6 @@ export function FieldDefEditor(props: FieldDefEditorProps) {
     options: useId(),
     default: useId(),
   }
-  const [optionsError, setOptionsError] = useState<string | null>(null)
   const name = field.label.trim() || field.key
   const hasDefault = Object.hasOwn(field, 'default')
   // Bumped by "No default" to start the default's input afresh.
@@ -142,7 +141,6 @@ export function FieldDefEditor(props: FieldDefEditorProps) {
             // Losing choices or a default can't be undone (D12), so ask first.
             const ask = `Change "${name}" to ${KINDS.find((k) => k.value === kind)?.label}? This removes ${lost.join(' and ')}.`
             if (lost.length > 0 && !window.confirm(ask)) return
-            setOptionsError(null)
             updateField(typeId, field.key, { kind })
           }}
         >
@@ -154,21 +152,16 @@ export function FieldDefEditor(props: FieldDefEditorProps) {
         </select>
       </div>
       {field.kind === 'enum' && (
-        // Leaving the box shows the saved choices again, so a refusal no longer applies.
-        <div className="inspector__row" onBlur={() => setOptionsError(null)}>
+        <div className="inspector__row">
           <label className="inspector__label" htmlFor={ids.options}>
             Choices
           </label>
-          <ListInput
+          <ChoicesInput
             id={ids.options}
-            value={field.options}
-            onChange={(options) => setOptionsError(updateField(typeId, field.key, { options }))}
+            options={field.options ?? []}
+            defaultValue={field.default}
+            onCommit={(options) => updateField(typeId, field.key, { options })}
           />
-          {optionsError && (
-            <p className="inspector__error" role="alert">
-              {optionsError}
-            </p>
-          )}
         </div>
       )}
       <div className={`inspector__row inspector__row--${field.kind}`}>
@@ -191,9 +184,11 @@ export function FieldDefEditor(props: FieldDefEditorProps) {
           )}
         </div>
         <FieldValueInput
-          // Remounted when the kind or choices change, or on "No default", so a draft (e.g. a
-          // half-typed number) can't linger. Not when the default is set by typing in it.
-          key={`${field.kind}:${(field.options ?? []).join('\n')}:${defaultResets}`}
+          // Remounted when the kind changes, or on "No default", so a draft (e.g. a half-typed
+          // number) can't linger. Not when the default is set by typing in it, and not when the
+          // choices are saved: that happens as you click into this dropdown (the Choices box
+          // saves when you leave it), and the dropdown's list follows the choices anyway.
+          key={`${field.kind}:${defaultResets}`}
           id={ids.default}
           field={field}
           value={field.default}

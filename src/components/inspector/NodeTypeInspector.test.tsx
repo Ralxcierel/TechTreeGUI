@@ -65,15 +65,12 @@ describe('NodeTypeInspector: fields', () => {
     fireEvent.change(age.getByLabelText('Kind'), { target: { value: 'enum' } })
     expect(era().fields[1]).toMatchObject({ label: 'Age', kind: 'enum', options: ['Option 1'] })
 
-    fireEvent.change(age.getByLabelText('Choices'), { target: { value: 'Stone\nIron\n' } })
+    const choices = age.getByLabelText('Choices')
+    fireEvent.change(choices, { target: { value: 'Stone\nIron\n' } })
+    fireEvent.blur(choices)
     expect(era().fields[1]!.options).toEqual(['Stone', 'Iron'])
     fireEvent.change(age.getByLabelText('Default for new nodes'), { target: { value: 'Iron' } })
     expect(era().fields[1]!.default).toBe('Iron')
-
-    // Emptying the choices is refused with a reason; the saved ones stay.
-    fireEvent.change(age.getByLabelText('Choices'), { target: { value: '' } })
-    expect(age.getByRole('alert').textContent).toBe('An enum field needs at least one choice.')
-    expect(era().fields[1]!.options).toEqual(['Stone', 'Iron'])
   })
 
   it('renames a key on Enter, moving node values; a refused key shows why and reverts', () => {
@@ -181,30 +178,55 @@ describe('NodeTypeInspector: review fixes', () => {
     expect(screen.queryByRole('button', { name: /Remove the default/ })).toBeNull()
   })
 
-  it('leaving an emptied Choices box shows the saved choices again', () => {
+  it('an emptied Choices box is refused on leaving it, and shows the saved choices again', () => {
     const key = s().addField('era')
     s().updateField('era', key, { kind: 'enum', options: ['Stone', 'Iron'] })
     render(<NodeTypeInspector typeId="era" />)
     const box = within(fieldBox('New field'))
     const choices = box.getByLabelText('Choices') as HTMLTextAreaElement
     fireEvent.change(choices, { target: { value: '' } })
-    expect(box.getByRole('alert')).toBeTruthy()
     fireEvent.blur(choices)
+    expect(box.getByRole('alert').textContent).toMatch(/at least one choice/)
     expect(choices.value).toBe('Stone\nIron')
+    expect(era().fields[1]!.options).toEqual(['Stone', 'Iron'])
   })
 
-  it('the choices error clears on a kind change', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('choices save on leaving the box, so editing the default choice keeps the default', () => {
+    const confirm = vi.spyOn(window, 'confirm')
     const key = s().addField('era')
-    s().updateField('era', key, { kind: 'enum', options: ['Stone'] })
+    s().updateField('era', key, { kind: 'enum', options: ['Low', 'High'] })
+    s().setFieldDefault('era', key, 'High')
     render(<NodeTypeInspector typeId="era" />)
-    const box = within(fieldBox('New field'))
-    fireEvent.change(box.getByLabelText('Choices'), { target: { value: '' } })
-    expect(box.getByRole('alert')).toBeTruthy()
-    fireEvent.change(box.getByLabelText('Kind'), { target: { value: 'text' } })
-    fireEvent.change(box.getByLabelText('Kind'), { target: { value: 'enum' } })
-    expect(era().fields[1]!.options).toEqual(['Option 1'])
-    expect(box.queryByRole('alert')).toBeNull()
+    const choices = within(fieldBox('New field')).getByLabelText('Choices') as HTMLTextAreaElement
+
+    // Typing alone saves nothing (the default "High" survives "Highe").
+    fireEvent.change(choices, { target: { value: 'Low\nHighe' } })
+    expect(era().fields[1]).toMatchObject({ options: ['Low', 'High'], default: 'High' })
+
+    // Leaving with the default gone asks first; Cancel keeps everything.
+    confirm.mockReturnValue(false)
+    fireEvent.change(choices, { target: { value: 'Low\nHighest' } })
+    fireEvent.blur(choices)
+    expect(confirm).toHaveBeenCalledWith(
+      '"High" is the default but no longer a choice. Save the choices and remove the default?',
+    )
+    expect(era().fields[1]).toMatchObject({ options: ['Low', 'High'], default: 'High' })
+    expect(choices.value).toBe('Low\nHigh')
+
+    // OK saves them and drops the default.
+    confirm.mockReturnValue(true)
+    fireEvent.change(choices, { target: { value: 'Low\nHighest' } })
+    fireEvent.blur(choices)
+    expect(era().fields[1]!.options).toEqual(['Low', 'Highest'])
+    expect(era().fields[1]).not.toHaveProperty('default')
+
+    // Keeping the default among the choices doesn't ask.
+    confirm.mockClear()
+    s().setFieldDefault('era', key, 'Low')
+    fireEvent.change(choices, { target: { value: 'Low\nMid\nHighest' } })
+    fireEvent.blur(choices)
+    expect(confirm).not.toHaveBeenCalled()
+    expect(era().fields[1]).toMatchObject({ options: ['Low', 'Mid', 'Highest'], default: 'Low' })
   })
 
   it('a removed renamed field leaves no alias behind for a later field with its key', () => {
@@ -275,15 +297,32 @@ describe('NodeTypeInspector: review round 2 fixes', () => {
     expect(confirm).not.toHaveBeenCalled()
   })
 
-  it('the choices error clears when leaving the box', () => {
+  it('leaving the Choices box with only spacing changes tidies it without saving or asking', () => {
+    const confirm = vi.spyOn(window, 'confirm')
+    const key = s().addField('era')
+    s().updateField('era', key, { kind: 'enum', options: ['Low', 'High'] })
+    const before = s().doc
+    render(<NodeTypeInspector typeId="era" />)
+    const choices = within(fieldBox('New field')).getByLabelText('Choices') as HTMLTextAreaElement
+    fireEvent.change(choices, { target: { value: ' Low \n\nLow\nHigh' } })
+    fireEvent.blur(choices)
+    expect(choices.value).toBe('Low\nHigh')
+    expect(s().doc).toBe(before)
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('a refused (empty) list of choices shows why; the next good save clears it', () => {
     const key = s().addField('era')
     s().updateField('era', key, { kind: 'enum' })
     render(<NodeTypeInspector typeId="era" />)
     const box = within(fieldBox('New field'))
     const choices = box.getByLabelText('Choices')
     fireEvent.change(choices, { target: { value: '' } })
+    fireEvent.blur(choices)
     expect(box.getByRole('alert')).toBeTruthy()
+    fireEvent.change(choices, { target: { value: 'A' } })
     fireEvent.blur(choices)
     expect(box.queryByRole('alert')).toBeNull()
+    expect(era().fields[1]!.options).toEqual(['A'])
   })
 })
