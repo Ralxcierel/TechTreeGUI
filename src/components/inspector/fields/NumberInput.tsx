@@ -14,11 +14,12 @@ interface NumberInputProps {
   onChange: (value: number) => void
   onClear?: () => void
   min?: number
+  step?: number
 }
 
 const show = (value: number | undefined) => (value === undefined ? '' : String(value))
 
-export function NumberInput({ id, value, onChange, onClear, min }: NumberInputProps) {
+export function NumberInput({ id, value, onChange, onClear, min, step }: NumberInputProps) {
   const [draft, setDraft] = useState(show(value))
   return (
     <input
@@ -26,6 +27,7 @@ export function NumberInput({ id, value, onChange, onClear, min }: NumberInputPr
       type="number"
       value={draft}
       min={min}
+      step={step}
       onChange={(e) => {
         const text = e.target.value
         setDraft(text)

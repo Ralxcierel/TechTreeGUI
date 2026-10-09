@@ -2,20 +2,17 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (session ended 2026-10-07, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (266 tests at hand-off).
-2. Waiting on the developer:
-   - review and approve **P2-3** at the gate
-   - answer the **[DECISION]** on list values below
-   - open the **Phase 1 PR** (link below)
-3. After approval, start **P2-4 (edge types)**. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
+## Resume here (updated 2026-10-08, at a clean increment boundary)
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (312 tests at hand-off).
+2. Waiting on the developer: review and approve **P2-4** at the gate, and confirm the P2-4 [DECISION]s listed under Open items.
+3. After approval, start **P2-5 (node types)**. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times).
 
 ## Where we are
-- **DESIGN Phase 2, increment P2-3 (full inspector) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-2 were approved.
-- The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12. Q1: the radial roadmap was added to `docs/DESIGN.md` (additions only). Q2: starter types Technology, Era and Note.
-- DESIGN Phase 1 is complete on `phase1-skeleton`. The **PR to `main` is to be opened by the developer.** The GitHub CLI isn't installed and the browser pane isn't signed in. Compare link: https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase1-skeleton?expand=1
-- Next: once the developer approves, **P2-4, edge types**: a Library panel (left) listing edge types; create, edit and delete them (name, meaning, colour, width, dash, arrow, line shape); the active edge type is used for new connections; deleting a type in use is blocked (D8).
+- **DESIGN Phase 2, increment P2-4 (edge types) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-3 were approved (P2-3 on 2026-10-08, along with the list-values tightening).
+- `main` already has Phase 1 and P2-0 to P2-2 (PRs #1 and #2 were merged by the developer). P2-3 and P2-4 are only on `phase2`.
+- The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12.
+- Next: **P2-5, node types**: Library list of node types; create, edit and delete them (name, style); a field-list editor (add, remove, reorder; key, label, kind, options, default, where shown); the active node type is used by **Add node**. D9 governs field edits on types in use.
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -62,6 +59,14 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
     - changed an edge's type, which re-drew it dashed
   - Independent review, 3 rounds, no bugs. Round 1 had 5 should-fixes: partial colours saved, "-" wiped numbers, non-text list items mangled, duplicate picker labels, width clear state. Round 2 had 2: rejected numbers staying on screen, an untested load tightening. Round 3 found 1 test that could never fail. All fixed.
 
+- **P2-4 edge types:**
+  - Model `src/model/edgeTypes.ts`: `createEdgeType` (id from the name via `typeIdFromName` in `ids.ts`, D10), `updateEdgeType` (style keys merged; unknown keys kept), `deleteEdgeType` (blocked while in use, D8), `edgeTypeUsage`, `typeInUseMessage` (shared with P2-5).
+  - Store: `activeEdgeTypeId` (editor-only, D11; read through `activeEdgeTypeId(state)`, which falls back to the first type) is used by `connect`/`isValidConnection`. `editing` holds a type opened from the Library. Opening one clears the canvas selection; selecting on the canvas, Done, deleting it or loading closes it.
+  - Library panel (left, `src/components/library/`): each edge type with a radio (active), a sample line, its name and its edge count; a name box + Add creates a type, makes it active and opens it.
+  - `EdgeTypeInspector`: name, meaning, colour, width (0.5 steps), dash (Solid / Dashed / Dotted / Long dash / Custom pattern), arrowhead, line shape, and Delete (disabled with "N edges use this type" while in use; asks first, D12).
+  - 312 tests. In the browser with real input: created "Unlocks", set it dashed, straight and amber, drew a connection (it came out amber, dashed, straight), switched the active type to Prerequisite and drew another (grey curve), saw Delete blocked with "1 edge uses this type", and selecting a node closed the type editor.
+  - Independent review, 3 rounds, no bugs. Round 1: blank names in the edge dropdown, a delete check that ignored `editing.kind`, the stale active pick after delete, arrow size in the swatch, accessibility labels. Round 2: width step (whole widths were invalid with min 0.5), trailing-dot dashes, whitespace-only names, radiogroup semantics. Round 3: dash separators the browser rejects (`8,,3`) and all-zero dashes, untrimmed meaning, a fallback test that couldn't fail. All fixed; round 3's fixes were tested but not re-reviewed (3-round cap).
+
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
 - **Increment 1:** drag, select and delete nodes (edges cascade, S8). Background, Controls, and a MiniMap colored by node type. The viewport is saved and restored (S9). Node objects keep identity and measured sizes, so nothing flickers.
@@ -91,13 +96,18 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
+- **[DECISION]** (P2-4, awaiting confirmation) Clicking a type in the Library opens it in the inspector and clears the canvas selection; selecting anything on the canvas closes it again; a Done button closes it too.
+- **[DECISION]** (P2-4) A new edge type is created from a name (so its id reads well, D10), starts with the Prerequisite look, becomes the active type and opens for editing.
+- **[DECISION]** (P2-4) The last edge type may be deleted if no edge uses it; connecting is then refused and the Library says to add one.
+- **[DECISION]** (P2-4) Dash is picked from presets (Solid, Dashed `6 4`, Dotted `2 4`, Long dash `12 6`) or typed as a custom pattern; only patterns the browser can draw are saved. Width is at least 0.5, in steps of 0.5.
+- **[ASSUMPTION]** (P2-4) An empty Meaning is stored as `null`; a name may be blank (the Library shows "(unnamed)" and falls back to the id elsewhere).
+- Resolved 2026-10-08: the P2-3 list-values tightening was accepted.
 - Resolved: a PR for `phase1-skeleton` → `main` was requested (the developer opens it, see above). RTL + jsdom were added.
 - Phase 2 decisions: approved (see `docs/PLAN-phase2.md` §4).
 - **[ASSUMPTION]** Inspector edits apply on every keystroke, not on Enter.
 - **[ASSUMPTION]** Side handles are hidden until a node is hovered or selected, or a connection is being dragged.
 - **[ASSUMPTION]** The first card field (if text) is the card's title, with no label. Lists show 3 items + "+N more". Rich text is clipped to 3 lines. Only text fields can be edited on the card (on-card dropdowns are Phase 3).
 - Known: a pill with many lines gets large rounded ends that crowd its text, and edges treat pills as rectangles. Pills are best for short cards.
-- **[DECISION]** (from P2-3, awaiting confirmation) List values must contain only strings. Node values that don't fit just show the warning badge, but a node type's list **default** containing non-strings now makes the file fail to load. This is a tightening of the earlier load rules.
 - **[ASSUMPTION]** Clearing a field (an empty number, "—" in a dropdown, an emptied image) removes the value, so the card shows "—".
 - **[ASSUMPTION]** An override equal to the type's value is kept (it pins the node if the type changes later). Use Reset to follow the type.
 - Known: while you delete characters in a colour box, intermediate valid colours (e.g. `#1234`) are saved, so the card flickers briefly.
@@ -107,7 +117,6 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **[ASSUMPTION]** Load rules (optional keys and defaults, duplicate and S7 rejection, field rules): see PLAN §1, "Load rules".
 - **[ASSUMPTION]** Integrity problems (dangling edges, unknown types) are reported only once the file's shape is valid.
 - **[ASSUMPTION]** Invalid connections are blocked live through `isValidConnection`, with no error message.
-- **[ASSUMPTION]** New edges always use the built-in `prereq` type. Choosing a type comes in DESIGN Phase 2.
 - **[ASSUMPTION]** The viewport is captured at Save time and is not tracked live. Delete and Backspace both delete.
 - **[ASSUMPTION]** Selection and measured sizes are editor-only and never saved.
 - **[ASSUMPTION]** ESLint is used instead of the oxlint that the Vite template ships. Prettier ignores `*.md` and `src/model/__fixtures__`.

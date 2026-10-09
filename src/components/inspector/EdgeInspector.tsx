@@ -52,7 +52,7 @@ export function EdgeInspector({ edgeId }: EdgeInspectorProps) {
           )}
           {edgeTypes.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {t.name.trim() || t.id}
             </option>
           ))}
         </select>
