@@ -1,6 +1,7 @@
 // What a node card shows: one line per field marked `card`, formatted by field kind (decision D6).
 // Pure, so the card component stays a thin renderer.
 import type { FieldDef, FieldKind, NodeType } from '../model'
+import { imageSource } from './images'
 
 export interface CardLine {
   key: string
@@ -21,6 +22,8 @@ export interface CardLine {
   choices?: readonly string[]
   /** The chosen value for the dropdown, or undefined for "—" (only with `choices`). */
   choice?: string
+  /** For an image field holding a picture address: draw the picture (`text` is the fallback). */
+  imageUrl?: string
 }
 
 export const EMPTY = '—'
@@ -78,6 +81,8 @@ export function cardLines(nodeType: NodeType, values: Record<string, unknown>): 
       editable,
     }
     if (editable) line.editValue = typeof value === 'string' ? value : ''
+    const src = field.kind === 'image' ? imageSource(value) : null
+    if (src) line.imageUrl = src
     const options = field.options ?? []
     if (
       field.kind === 'enum' &&
@@ -96,6 +101,8 @@ export interface FieldLine {
   label: string
   kind: FieldKind
   text: string
+  /** For an image field holding a picture address: draw the picture (`text` is the fallback). */
+  imageUrl?: string
 }
 
 /**
@@ -111,12 +118,15 @@ function fieldLines(
     .filter((f) => f.show.includes(placement))
     .map((field) => {
       const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined
-      return {
+      const line: FieldLine = {
         key: field.key,
         label: field.label,
         kind: field.kind,
         text: formatValue(field.kind, value, Infinity),
       }
+      const src = field.kind === 'image' ? imageSource(value) : null
+      if (src) line.imageUrl = src
+      return line
     })
 }
 

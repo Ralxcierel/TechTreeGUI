@@ -676,3 +676,77 @@ body,
 .card-expanded__value {
   white-space: pre-line;
 }
+
+/* Pictures: image fields on the card, in tooltips and in expanded sections. */
+.card-image {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.graph-node__image {
+  max-height: 120px;
+  margin-top: 2px;
+}
+
+.card-tooltip__image,
+.card-expanded__image {
+  max-height: 160px;
+  margin-top: 2px;
+}
+
+.card-image--broken {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* The node's icon at the card's top-left (centred above the title on circles). */
+.graph-node__icon {
+  float: left;
+  width: 20px;
+  height: 20px;
+  margin: 0 6px 2px 0;
+  object-fit: contain;
+}
+
+.graph-node__icon--text {
+  display: flex;
+  align-items: center;
+  /* A long text icon shows its start, cut off at the end, rather than a piece of its middle. */
+  justify-content: safe center;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.graph-node--circle .graph-node__icon {
+  float: none;
+  margin: 0 auto 4px;
+}
+
+/* The card body contains the floated icon (so the card is never shorter than it). */
+.graph-node__body {
+  display: flow-root;
+}
+
+/* The title's inline editor fits beside the icon instead of dropping below it. */
+.graph-node__icon + .graph-node__input {
+  width: calc(100% - 26px);
+}
+
+.graph-node--circle .graph-node__icon + .graph-node__input {
+  width: 100%;
+}
+
+.graph-node__icon--broken {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Keep later lines from wrapping around the floated icon. */
+.graph-node__line,
+.card-expanded__toggle,
+.card-expanded {
+  clear: left;
+}

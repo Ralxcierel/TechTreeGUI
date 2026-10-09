@@ -2,16 +2,17 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (updated 2026-10-08, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (393 tests at hand-off).
-2. Waiting on the developer: review and approve **P3-2 (expandable sections)** at the gate.
-3. After approval, start **P3-3 (pictures and icons)** from `docs/PLAN-phase3.md`. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
-4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times). The browser pane's console log can show old errors from earlier edits; check timestamps.
+## Resume here (session ended 2026-10-09, at a clean increment boundary)
+1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (426 tests at hand-off).
+2. Waiting on the developer: review and approve **P3-3 (pictures and icons)** at the gate.
+3. After approval, start **P3-4 (named handles, schema v3)** from `docs/PLAN-phase3.md`: restate it, flag new decisions (D5 and D8 cover the schema and the delete rule), build model → migration v2→v3 + round-trip test → type editor handle list → card handles → connecting and fixed anchoring (and the floating end aiming at a fixed handle), test, review loop, stop at the gate, push. Then **P3-5, the Phase 3 gate**.
+4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
+5. Shell gotcha seen this session: in Bash heredocs on this machine, `\n` inside Python string literals turned into real newlines, which broke edits and once silently dropped a test assertion. Prefer the Edit tool for lines that contain `\n` or regex escapes, and re-read the result.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8 and Q1–Q3 answered "not now"). P3-0 (tooltips) and P3-1 (on-card dropdowns) were approved. **P3-2 (expandable sections) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.**
-- DESIGN Phase 2 is complete and approved.
-- **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2; everything after is only on `phase2`.
+- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 (tooltips), P3-1 (on-card dropdowns) and P3-2 (expandable sections) are approved. **P3-3 (pictures and icons) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.** Still to do: P3-4 (named handles) and P3-5 (gate).
+- DESIGN Phases 1 and 2 are complete and approved.
+- **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
 ## Done (DESIGN Phase 3 so far)
 - **P3-0 tooltips:**
@@ -36,6 +37,15 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - 393 tests. In the browser with real input: opening a card grew it (66 → 109 px) and the attached edge re-anchored to the new bottom; the node wasn't selected; with the toggle focused, Enter and Space toggled it and Escape did nothing.
   - Independent review, 3 rounds. Round 1 found **a bug**: Enter, Space or Escape on the toggle reached React Flow and selected or deselected the node; fixed with `nokey` and checked in the browser. Also: a save test that couldn't fail (rewritten), deleted nodes kept in the open set, the toggle off-centre on circles, and the accessible name. Round 2 (no bugs): the accessible name didn't contain the visible word "More" (voice control); a `nokey` test assertion that had silently failed to be added; the focus style. Round 3: clean.
   - Accepted limitations: on circle cards the section, or the toggle itself if the card is already full, is clipped; a card whose type loses and later regains its expanded fields reappears open; an open pill card grows into a tall stadium shape.
+
+- **P3-3 pictures and icons:**
+  - `src/editor/images.ts`: `imageSource` (only `http(s)://` without spaces and `data:image/…` count as pictures; anything else stays text, so no other scheme reaches an `<img>`) and `cardIcon` (picture, short text, or nothing).
+  - `cardDisplay`: card, tooltip and expanded lines of image fields get `imageUrl`. `CardImage.tsx` draws pictures (no-referrer, not draggable, lazy); a failure shows "(image unavailable)" with the address (shortened) as hover text, and a loaded picture clears the failure so a failed address is retried.
+  - `CardIconView.tsx`: the icon (type `style.icon`, or the node's override, D3) at the card's top-left, floated (centred above the title on circles). A broken icon picture shows a small decorative "⚠". The card body contains the icon (`flow-root`), and the title's inline editor fits beside it.
+  - Editors: an Icon box in the node type editor (empty or blank = no icon = `null`), and an Icon row in the node's style overrides (`IconOverrideInput.tsx`: keeps what you type while focused; empty or Reset follows the type).
+  - 426 tests. In the browser with real input: a ⚙ text icon on the card's title row; the title editor beside the icon; a `data:` SVG picture on the card (the card grew); a broken `data:` address showed the fallback.
+  - Independent review, 2 rounds. Round 1 (no bugs): the override Icon box snapped back to the type's icon while typing; a broken icon picture's note covered the title; the floated icon could hang outside the card; plus nits (title editor dropping below the icon, long text icons cropped in the middle, no retry for a failed address, blank icons stored, huge fallback hover text, missing tests). All fixed. Round 2: clean.
+  - Known and accepted: picture addresses are saved on every keystroke, so typing a URL requests partial addresses and the card flickers; on circles the icon takes room from the fixed-height content; pills and circles crop or round pictures awkwardly; an explicit "no icon" override for one node can't be set from the UI; a picture line reads "Art: Art, image" to screen readers; opening a file loads its remote picture addresses (no referrer is sent).
 
 
 ## Done (DESIGN Phase 2 so far)

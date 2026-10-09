@@ -5,6 +5,7 @@ import { useId, useState, type ReactNode } from 'react'
 import { useEditorStore } from '../../editor/store'
 import { NODE_SHAPES, type NodeStyle } from '../../model'
 import { ColorInput } from './ColorInput'
+import { IconOverrideInput } from './IconOverrideInput'
 import { NumberInput } from './fields/NumberInput'
 
 interface StyleOverridesProps {
@@ -15,7 +16,7 @@ interface StyleOverridesProps {
 
 export function StyleOverrides({ nodeId, typeStyle, overrides }: StyleOverridesProps) {
   const setOverride = useEditorStore((s) => s.setNodeStyleOverride)
-  const ids = { shape: useId(), width: useId(), fill: useId(), border: useId() }
+  const ids = { shape: useId(), width: useId(), fill: useId(), border: useId(), icon: useId() }
   // Bumped on Reset so the width box (which keeps its own draft while typing) starts over with the
   // type's width. Keying on "overridden or not" instead would remount it mid-typing.
   const [widthResets, setWidthResets] = useState(0)
@@ -104,6 +105,17 @@ export function StyleOverrides({ nodeId, typeStyle, overrides }: StyleOverridesP
           onReset={() => reset('border')}
           value={overrides.border ?? typeStyle.border}
           onChange={(v) => setOverride(nodeId, 'border', v)}
+        />,
+      )}
+      {row(
+        'icon',
+        'Icon',
+        <IconOverrideInput
+          id={ids.icon}
+          // An explicit "no icon" override (null) shows as empty, like no icon at all.
+          value={(overrides.icon !== undefined ? overrides.icon : typeStyle.icon) ?? ''}
+          onChange={(v) => setOverride(nodeId, 'icon', v)}
+          onReset={() => reset('icon')}
         />,
       )}
     </section>

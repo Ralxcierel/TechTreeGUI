@@ -20,7 +20,14 @@ export function NodeTypeInspector({ typeId }: NodeTypeInspectorProps) {
   const remove = useEditorStore((s) => s.deleteNodeType)
   const addField = useEditorStore((s) => s.addField)
   const close = useEditorStore((s) => s.editNodeType)
-  const ids = { shape: useId(), width: useId(), fill: useId(), border: useId(), why: useId() }
+  const ids = {
+    shape: useId(),
+    width: useId(),
+    fill: useId(),
+    border: useId(),
+    icon: useId(),
+    why: useId(),
+  }
   // A stable React key per field. Keying by the field key alone would remount a field's editor
   // when its key is renamed, losing focus (and swallowing a click on its buttons). So a renamed
   // field keeps the React key it had: `aliases` maps its new field key to that React key.
@@ -137,6 +144,23 @@ export function NodeTypeInspector({ typeId }: NodeTypeInspectorProps) {
             value={style.border}
             onChange={(border) => update(typeId, { style: { border } })}
             onReset={() => {}}
+          />
+        </div>
+        <div className="inspector__row">
+          <label className="inspector__label" htmlFor={ids.icon}>
+            Icon
+          </label>
+          <input
+            id={ids.icon}
+            type="text"
+            placeholder="Emoji, text or image URL"
+            value={style.icon ?? ''}
+            // An empty (or blank) box means no icon.
+            onChange={(e) =>
+              update(typeId, {
+                style: { icon: e.target.value.trim() === '' ? null : e.target.value },
+              })
+            }
           />
         </div>
       </section>

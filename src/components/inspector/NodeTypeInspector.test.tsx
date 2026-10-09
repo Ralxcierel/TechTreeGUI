@@ -326,3 +326,13 @@ describe('NodeTypeInspector: review round 2 fixes', () => {
     expect(era().fields[1]!.options).toEqual(['A'])
   })
 })
+
+describe('NodeTypeInspector: icon', () => {
+  it('sets the type icon, and an empty box removes it', () => {
+    render(<NodeTypeInspector typeId="era" />)
+    fireEvent.change(screen.getByLabelText('Icon'), { target: { value: '⚙' } })
+    expect(era().style.icon).toBe('⚙')
+    fireEvent.change(screen.getByLabelText('Icon'), { target: { value: '' } })
+    expect(era().style.icon).toBeNull()
+  })
+})

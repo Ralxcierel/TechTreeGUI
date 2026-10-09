@@ -179,3 +179,32 @@ describe('expandedLines', () => {
     ])
   })
 })
+
+describe('pictures in card, tooltip and expanded lines', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      { key: 'art', label: 'Art', kind: 'image', show: ['card', 'tooltip', 'expanded'] },
+      { key: 'url', label: 'Link', kind: 'text', show: ['card'] },
+    ],
+  }
+
+  it('gives image fields holding a picture address an imageUrl, everywhere', () => {
+    const values = { art: ' https://x/a.png ', url: 'https://x/b.png' }
+    expect(cardLines(type, values)[1]!.imageUrl).toBe('https://x/a.png')
+    expect(tooltipLines(type, values)[0]!.imageUrl).toBe('https://x/a.png')
+    expect(expandedLines(type, values)[0]!.imageUrl).toBe('https://x/a.png')
+    // A text field holding an address stays text.
+    expect(cardLines(type, values)[2]).not.toHaveProperty('imageUrl')
+  })
+
+  it('leaves other values as text', () => {
+    for (const art of ['file:///a.png', 'not a url', 42, null, undefined]) {
+      expect(cardLines(type, { art })[1]).not.toHaveProperty('imageUrl')
+      expect(tooltipLines(type, { art })[0]).not.toHaveProperty('imageUrl')
+    }
+  })
+})

@@ -209,3 +209,41 @@ describe('other data', () => {
     expect(screen.queryByRole('region', { name: 'Other data' })).toBeNull()
   })
 })
+
+describe('style overrides: icon', () => {
+  const style = () => within(screen.getByRole('region', { name: 'Style' }))
+
+  it("overrides the type's icon; emptying the box (or Reset) follows the type again", () => {
+    setup()
+    const icon = () => style().getByRole('textbox', { name: /^Icon/ }) as HTMLInputElement
+    expect(icon().value).toBe('')
+    fireEvent.change(icon(), { target: { value: '⚙' } })
+    expect(node().styleOverrides).toEqual({ icon: '⚙' })
+    fireEvent.change(icon(), { target: { value: '' } })
+    expect(node().styleOverrides).toEqual({})
+
+    fireEvent.change(icon(), { target: { value: 'https://x/i.png' } })
+    fireEvent.click(style().getByRole('button', { name: /Reset icon/ }))
+    expect(node().styleOverrides).toEqual({})
+  })
+})
+
+describe('style overrides: icon while typing', () => {
+  const style = () => within(screen.getByRole('region', { name: 'Style' }))
+
+  it("keeps what you type even when empty for a moment, instead of snapping to the type's icon", () => {
+    s().updateNodeType('technology', { style: { icon: '⚙' } })
+    setup({ title: 'Fire' }, { icon: 'X' })
+    const icon = style().getByRole('textbox', { name: /^Icon/ }) as HTMLInputElement
+    expect(icon.value).toBe('X')
+    fireEvent.focus(icon)
+    fireEvent.change(icon, { target: { value: '' } })
+    expect(icon.value).toBe('')
+    expect(node().styleOverrides).toEqual({}) // follows the type meanwhile
+    fireEvent.change(icon, { target: { value: 'Y' } })
+    expect(node().styleOverrides).toEqual({ icon: 'Y' })
+    fireEvent.change(icon, { target: { value: '' } })
+    fireEvent.blur(icon)
+    expect(icon.value).toBe('⚙') // leaving shows the icon in use
+  })
+})

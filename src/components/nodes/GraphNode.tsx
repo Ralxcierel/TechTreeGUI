@@ -6,8 +6,11 @@ import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/card
 import { useEditorStore } from '../../editor/store'
 import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle } from '../../model'
+import { cardIcon } from '../../editor/images'
 import { CardEnumSelect } from './CardEnumSelect'
 import { CardExpanded } from './CardExpanded'
+import { CardIconView } from './CardIconView'
+import { CardImage } from './CardImage'
 import { CardTooltip } from './CardTooltip'
 import { EditableText } from './EditableText'
 import { useHoverIntent } from './useHoverIntent'
@@ -55,6 +58,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const style = resolveNodeStyle(nodeType.style, data.overrides)
   const shape = knownShape(style.shape)
   const lines = cardLines(nodeType, data.values)
+  const icon = cardIcon(style.icon)
   const tips = tooltipLines(nodeType, data.values)
   const more = expandedLines(nodeType, data.values)
   const tooltipShown = hover.shown && tips.length > 0 && !dragging && !connecting && !editing
@@ -86,6 +90,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
         <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
       ))}
       <div className="graph-node__body">
+        {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
           const commit = (value: string) => setNodeField(id, line.key, value)
           if (line.title) {
@@ -108,7 +113,9 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
           return (
             <div key={line.key} className={`graph-node__line graph-node__line--${line.kind}`}>
               <span className="graph-node__label">{line.label}: </span>
-              {line.choices ? (
+              {line.imageUrl ? (
+                <CardImage className="graph-node__image" src={line.imageUrl} alt={line.label} />
+              ) : line.choices ? (
                 <CardEnumSelect
                   label={line.label}
                   choices={line.choices}
