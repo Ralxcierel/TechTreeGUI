@@ -90,8 +90,8 @@ export function cardLines(nodeType: NodeType, values: Record<string, unknown>): 
   })
 }
 
-/** One `Label: value` line of a node's tooltip. */
-export interface TooltipLine {
+/** One read-only `Label: value` line, as in a node's tooltip or expanded section. */
+export interface FieldLine {
   key: string
   label: string
   kind: FieldKind
@@ -99,12 +99,16 @@ export interface TooltipLine {
 }
 
 /**
- * What a node's tooltip shows: one line per field marked `tooltip`, in the type's field order.
- * Lists are shown in full (there is more room than on the card). Empty when there are none.
+ * One line per field shown in `placement`, in the type's field order, formatted like the card
+ * but with lists in full (there is more room than on the card). Empty when there are none.
  */
-export function tooltipLines(nodeType: NodeType, values: Record<string, unknown>): TooltipLine[] {
+function fieldLines(
+  nodeType: NodeType,
+  values: Record<string, unknown>,
+  placement: 'tooltip' | 'expanded',
+): FieldLine[] {
   return nodeType.fields
-    .filter((f) => f.show.includes('tooltip'))
+    .filter((f) => f.show.includes(placement))
     .map((field) => {
       const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined
       return {
@@ -114,4 +118,14 @@ export function tooltipLines(nodeType: NodeType, values: Record<string, unknown>
         text: formatValue(field.kind, value, Infinity),
       }
     })
+}
+
+/** What a node's tooltip shows: its fields marked `tooltip`. */
+export function tooltipLines(nodeType: NodeType, values: Record<string, unknown>): FieldLine[] {
+  return fieldLines(nodeType, values, 'tooltip')
+}
+
+/** What a node's expanded section shows: its fields marked `expanded`. */
+export function expandedLines(nodeType: NodeType, values: Record<string, unknown>): FieldLine[] {
+  return fieldLines(nodeType, values, 'expanded')
 }

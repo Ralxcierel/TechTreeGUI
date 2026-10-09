@@ -625,3 +625,54 @@ body,
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
+
+/* The expanded section of a card (fields marked "expanded"), opened with the More/Less toggle. */
+.card-expanded__toggle {
+  display: block;
+  margin-top: 6px;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.card-expanded__toggle:hover {
+  color: var(--accent);
+}
+
+/* A visible ring for keyboard focus (the text alone is small). */
+.card-expanded__toggle:focus-visible {
+  color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Circle cards centre their content; a block-level button needs auto margins for that. */
+.graph-node--circle .card-expanded__toggle {
+  margin-inline: auto;
+}
+
+.card-expanded {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.card-expanded__line {
+  margin-top: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.card-expanded__label {
+  color: var(--text-muted);
+}
+
+/* Rich text keeps its line breaks, in full (the card itself clips it to three lines). */
+.card-expanded__value {
+  white-space: pre-line;
+}

@@ -2,11 +2,12 @@
 // own style overrides), not from code.
 import { Handle, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
 import { useId, useState } from 'react'
-import { cardLines, EMPTY, tooltipLines } from '../../editor/cardDisplay'
+import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
 import { useEditorStore } from '../../editor/store'
 import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle } from '../../model'
 import { CardEnumSelect } from './CardEnumSelect'
+import { CardExpanded } from './CardExpanded'
 import { CardTooltip } from './CardTooltip'
 import { EditableText } from './EditableText'
 import { useHoverIntent } from './useHoverIntent'
@@ -25,6 +26,8 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
   const setNodeField = useEditorStore((s) => s.setNodeField)
   const removeNodeField = useEditorStore((s) => s.removeNodeField)
+  const expanded = useEditorStore((s) => s.expandedNodeIds.has(id))
+  const toggleExpanded = useEditorStore((s) => s.toggleExpanded)
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -53,6 +56,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const shape = knownShape(style.shape)
   const lines = cardLines(nodeType, data.values)
   const tips = tooltipLines(nodeType, data.values)
+  const more = expandedLines(nodeType, data.values)
   const tooltipShown = hover.shown && tips.length > 0 && !dragging && !connecting && !editing
 
   return (
@@ -128,6 +132,14 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
             </div>
           )
         })}
+        {more.length > 0 && (
+          <CardExpanded
+            name={lines.find((l) => l.title && l.text !== EMPTY)?.text ?? nodeType.name}
+            lines={more}
+            open={expanded}
+            onToggle={() => toggleExpanded(id)}
+          />
+        )}
       </div>
     </div>
   )

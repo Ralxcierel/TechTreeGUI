@@ -69,6 +69,8 @@ interface EditorState {
   activeEdgeTypeId: string | null
   /** The node type "Add node" uses (editor-only, D11); read it through `activeNodeTypeId(state)`. */
   activeNodeTypeId: string | null
+  /** Nodes whose expanded section is open (editor-only, not saved: D4 of Phase 3). */
+  expandedNodeIds: ReadonlySet<string>
   /** The type shown in the inspector, or null to show the canvas selection. */
   editing: Editing | null
   addNode: (typeId: string, position: Position) => void
@@ -87,6 +89,8 @@ interface EditorState {
   updateEdgeType: (typeId: string, patch: EdgeTypePatch) => void
   /** Deletes an edge type. Returns why not (e.g. edges still use it), or null when it worked. */
   deleteEdgeType: (typeId: string) => string | null
+  /** Opens or closes a node's expanded section. */
+  toggleExpanded: (nodeId: string) => void
   /** Picks the node type "Add node" uses. */
   setActiveNodeType: (typeId: string) => void
   /** Opens a node type in the inspector (clearing the canvas selection), or closes it with null. */
@@ -159,11 +163,25 @@ export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'
   return types[0]?.id ?? null
 }
 
+/** Forgets deleted nodes' open sections. */
+function pruneExpanded(
+  expanded: ReadonlySet<string>,
+  before: GraphDocument,
+  after: GraphDocument,
+): Partial<Pick<EditorState, 'expandedNodeIds'>> {
+  // Node changes only ever remove nodes (never add), so an unchanged count means none removed.
+  if (after.nodes === before.nodes || after.nodes.length === before.nodes.length) return {}
+  if (expanded.size === 0) return {}
+  const ids = new Set(after.nodes.map((n) => n.id))
+  const kept = [...expanded].filter((id) => ids.has(id))
+  return kept.length === expanded.size ? {} : { expandedNodeIds: new Set(kept) }
+}
+
 /** Selecting something on the canvas closes a type opened from the Library. */
 function closeEditingOnSelect(
   editing: Editing | null,
   ui: UiState,
-): Pick<EditorState, 'editing'> | object {
+): Partial<Pick<EditorState, 'editing'>> {
   return editing && (ui.selectedNodeIds.size > 0 || ui.selectedEdgeIds.size > 0)
     ? { editing: null }
     : {}
@@ -208,12 +226,17 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     flowNodes: [],
     activeEdgeTypeId: null,
     activeNodeTypeId: null,
+    expandedNodeIds: new Set(),
     editing: null,
     addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
     onNodesChange: (changes) =>
       set((s) => {
         const next = reduceNodeChanges(s.doc, s.ui, changes)
-        return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
+        return {
+          ...derive(s, next.doc, next.ui),
+          ...closeEditingOnSelect(s.editing, next.ui),
+          ...pruneExpanded(s.expandedNodeIds, s.doc, next.doc),
+        }
       }),
     onEdgesChange: (changes) =>
       set((s) => {
@@ -253,6 +276,12 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       }))
       return null
     },
+    toggleExpanded: (nodeId) =>
+      set((s) => {
+        const next = new Set(s.expandedNodeIds)
+        if (!next.delete(nodeId)) next.add(nodeId)
+        return { expandedNodeIds: next }
+      }),
     setActiveNodeType: (typeId) => set({ activeNodeTypeId: typeId }),
     editNodeType: (typeId) =>
       set((s) => openType(s, typeId === null ? null : { kind: 'nodeType', id: typeId })),
@@ -315,6 +344,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           flowNodes: toFlowNodes(doc, ui),
           activeEdgeTypeId: null,
           activeNodeTypeId: null,
+          expandedNodeIds: new Set(),
           editing: null,
         }
       }),

@@ -3,13 +3,13 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Resume here (updated 2026-10-08, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (385 tests at hand-off).
-2. Waiting on the developer: review and approve **P3-1 (on-card dropdowns)** at the gate.
-3. After approval, start **P3-2 (expandable sections)** from `docs/PLAN-phase3.md`. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (393 tests at hand-off).
+2. Waiting on the developer: review and approve **P3-2 (expandable sections)** at the gate.
+3. After approval, start **P3-3 (pictures and icons)** from `docs/PLAN-phase3.md`. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times). The browser pane's console log can show old errors from earlier edits; check timestamps.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8 and Q1–Q3 answered "not now"). P3-0 (tooltips) was approved. **P3-1 (on-card dropdowns) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.**
+- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8 and Q1–Q3 answered "not now"). P3-0 (tooltips) and P3-1 (on-card dropdowns) were approved. **P3-2 (expandable sections) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.**
 - DESIGN Phase 2 is complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2; everything after is only on `phase2`.
 
@@ -27,6 +27,15 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - `CardEnumSelect.tsx`: a native `<select>` with "—" plus the choices; "—" removes the value. `nodrag nopan` and a stopped click keep React Flow from dragging, panning or selecting the node.
   - 385 tests. In the browser with real input: a Branch choice field on Technology; picked "Military" on the card with a click, arrow keys and Enter, and the node wasn't selected or moved; with the node selected, Delete/Backspace in the dropdown left the node alone; card and inspector agreed.
   - Independent review: 1 round, no bugs, no should-fixes. Applied a nit (dark colours for the open list). Noted, not changed: a hand-edited file with duplicate or empty choices gives a React key warning, or a choice that acts like "—" (the inspector already behaves the same); the mouse wheel over a closed dropdown zooms the canvas.
+
+- **P3-2 expandable sections:**
+  - `cardDisplay.ts`: a shared `fieldLines` helper behind `tooltipLines` and the new `expandedLines`. `FieldLineList.tsx` draws read-only `Label: value` lines for both the tooltip and the section.
+  - `CardExpanded.tsx`: a "▸ More / ▾ Less" toggle at the bottom of cards whose type has `expanded` fields. When open, those fields show below the card lines (lists in full, rich text with its line breaks). Accessible name "More/Less details of <title>", `aria-expanded`, `aria-controls` on an always-present section that is `hidden` when closed, and a focus ring. `nodrag nopan nokey` plus a stopped click: mouse or keyboard toggling never drags, pans or selects the node.
+  - Store: `expandedNodeIds` and `toggleExpanded`. Editor-only (never part of the document, D4), cleared on New/Load, and deleted nodes are forgotten.
+  - The field editor's "expanded view arrives later" note was removed.
+  - 393 tests. In the browser with real input: opening a card grew it (66 → 109 px) and the attached edge re-anchored to the new bottom; the node wasn't selected; with the toggle focused, Enter and Space toggled it and Escape did nothing.
+  - Independent review, 3 rounds. Round 1 found **a bug**: Enter, Space or Escape on the toggle reached React Flow and selected or deselected the node; fixed with `nokey` and checked in the browser. Also: a save test that couldn't fail (rewritten), deleted nodes kept in the open set, the toggle off-centre on circles, and the accessible name. Round 2 (no bugs): the accessible name didn't contain the visible word "More" (voice control); a `nokey` test assertion that had silently failed to be added; the focus style. Round 3: clean.
+  - Accepted limitations: on circle cards the section, or the toggle itself if the card is already full, is clipped; a card whose type loses and later regains its expanded fields reappears open; an open pill card grows into a tall stadium shape.
 
 
 ## Done (DESIGN Phase 2 so far)

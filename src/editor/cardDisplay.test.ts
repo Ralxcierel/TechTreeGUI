@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDef, NodeType } from '../model'
-import { cardLines, EMPTY, formatValue, tooltipLines } from './cardDisplay'
+import { cardLines, EMPTY, expandedLines, formatValue, tooltipLines } from './cardDisplay'
 
 describe('formatValue', () => {
   it.each([
@@ -155,5 +155,27 @@ describe('cardLines: enum dropdowns', () => {
       expect(line).not.toHaveProperty('choices')
       expect(line.editable).toBe(false)
     }
+  })
+})
+
+describe('expandedLines', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      { key: 'details', label: 'Details', kind: 'richtext', show: ['expanded'] },
+      { key: 'cost', label: 'Cost', kind: 'number', show: ['tooltip'] },
+      { key: 'tags', label: 'Tags', kind: 'list', show: ['card', 'expanded'] },
+    ],
+  }
+
+  it('lists only fields marked expanded, in order, with lists in full', () => {
+    const lines = expandedLines(type, { details: 'a\nb', tags: ['1', '2', '3', '4'] })
+    expect(lines.map((l) => [l.key, l.text])).toEqual([
+      ['details', 'a\nb'],
+      ['tags', '1, 2, 3, 4'],
+    ])
   })
 })
