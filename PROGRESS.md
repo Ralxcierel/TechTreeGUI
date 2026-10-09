@@ -2,17 +2,16 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (updated 2026-10-08, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (363 tests at hand-off).
-2. Waiting on the developer: review and approve **P2-5** at the gate, and answer the open **[QUESTION]** about editing enum choices (see Open items).
-3. After approval, start **P2-6 (Phase 2 gate)**: the automated "done when" test from `docs/PLAN-phase2.md` §1, a hand check in the browser with a radial layout screenshot, and a `PROGRESS.md` update.
+## Resume here (updated 2026-10-08, at the Phase 2 gate)
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (365 tests at hand-off).
+2. Waiting on the developer: approve the **DESIGN Phase 2 gate** (P2-6), and decide whether to open a PR `phase2` → `main` (P2-3 to P2-6 aren't on `main` yet).
+3. After approval: plan **DESIGN Phase 3** (see `docs/DESIGN.md` §5 and the Phase 3 notes in `docs/PLAN-phase2.md` §5) with the walking-skeleton method, and stop for approval of that plan before building.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times, including during P2-5).
 
 ## Where we are
-- **DESIGN Phase 2, increment P2-5 (node types) is built, reviewed, committed and pushed on branch `phase2`. It is waiting for the developer's review at the gate.** P2-0 to P2-4 were approved (P2-4 on 2026-10-08, with all its decisions).
-- `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). P2-3 to P2-5 are only on `phase2`.
+- **DESIGN Phase 2 is complete and at its gate (P2-6), waiting for the developer's approval.** P2-0 to P2-5 were approved (P2-5 on 2026-10-08, together with option (a) for enum choices, which was then built).
+- `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). P2-3 to P2-6 are only on `phase2`.
 - The Phase 2 plan (`docs/PLAN-phase2.md`) is approved, including D1–D12.
-- Next: **P2-6, the Phase 2 gate.**
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -76,6 +75,20 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - 363 tests. In the browser with real input: created "Wonder", made it a circle, added a field, made it a choice with Ancient/Classical/Modern, set the default to Classical, renamed its key to `age` with Enter, then **Add node** made a Wonder circle reading "New Wonder / Age: Classical".
   - Independent review, 3 rounds. Round 1 (no bugs): renaming a key remounted the field editor (focus and clicks lost), missing Library and toolbar tests, plus nits. Round 2 found **a bug**: typing a default lost focus after one letter. Also Choices and Default still remounted on a rename. Round 3 (no bugs): a test that couldn't fail, a stale alias after removing a renamed field, a stale key error. All fixed; round 3's fixes were tested but not re-reviewed (3-round cap). One round-3 finding is left open as a [QUESTION] below.
 
+- **P2-5 follow-up (developer's choice (a)):** enum choices are saved when you leave the Choices box, not on every keystroke (`ChoicesInput.tsx`). If the default would no longer be a choice, it asks first; Cancel puts the saved choices back. Only spacing changes tidy the box without saving. The Default dropdown is no longer rebuilt when the choices are saved, so clicking from Choices straight into it works (checked in a real browser). Independent review: 1 round, no bugs; its should-fix (the dropdown rebuild) and nits were fixed. A known trade-off stays: if the choices would drop the default and you leave the box by clicking that field's "No default" or "Remove", the confirm appears first and that click may need repeating.
+- **P2-6 Phase 2 gate:**
+  - `src/editor/phase2.acceptance.test.ts` automates the plan's "done when":
+    1. creates node type "Era" (circle, own colours, an enum field "Age") and edge type "Unlocks" (dashed, straight)
+    2. puts an Era hub in the centre with 6 technologies at 0°, 60°, … 300°, connected outwards from the generic side handles (stored as floating), and checks each edge leaves the circle on the side facing its technology
+    3. edits a text field, the enum, a style override and one edge's type
+    4. saves, resets the store (a reload), loads, and gets a deep-equal, byte-identical document
+  - Hand check in the browser (1400×900 viewport), with real mouse and keyboard except where noted:
+    - created "Unlocks" (dashed, straight, amber) and node type "Epoch" (circle, amber colours, an Age choice field with Ancient/Classical/Medieval). It is named Epoch because the built-in Era already exists, and deleting Era would have opened a confirm dialog the pane can't answer.
+    - added the hub and 6 technologies with **Add node** (switching the active type in the Library), dragged them into a radial layout, and drew the 6 connections from the hub's handles. All came out dashed, straight and amber, each leaving the circle on the side facing its technology. **Radial screenshot taken** (shown in the session; not stored in the repo).
+    - edited the hub's Name and Age in the inspector, and renamed the 6 technologies on their cards (double-click, type, Enter).
+    - **Save → reload → Load:** Save's download was caught in the page (instead of writing a file to the computer) and handed to the Load input with JavaScript, because the OS file picker can't be driven. The app's real Save and Load handlers ran. After the reload the graph was **identical**: same node ids, text, shapes, screen positions (viewport), edge paths and styles, and both custom types, with no error banner.
+  - Independent review of the acceptance test: no bugs; its nits were applied (the test now follows the UI path more closely: active types, side-handle ids, outline from the type's shape).
+
 ## Done (DESIGN Phase 1)
 - **Skeleton:** Vite 8, React 19, TypeScript 6 (strict + `noUncheckedIndexedAccess`), ESLint 10, Prettier, Vitest 5. It covers model → Zustand store → controlled React Flow → JSON download/upload.
 - **Increment 1:** drag, select and delete nodes (edges cascade, S8). Background, Controls, and a MiniMap colored by node type. The viewport is saved and restored (S9). Node objects keep identity and measured sizes, so nothing flickers.
@@ -105,8 +118,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
-- **[QUESTION]** (P2-5, from review round 3) Choices save on every keystroke, and a default that stops matching a choice is dropped right away, without asking. Example: choices "Low / High", default "High"; editing that line to "Highest" drops the default at "Highe", and it doesn't come back. Options: (a) save choices when leaving the box, and ask if the default would be lost (recommended); (b) keep as is; (c) keep the default while typing and only drop it when leaving the box.
-- **[DECISION]** (P2-5, accepted in advance by the developer's "accept all your recommendations") New node types start with the Technology look and a `title` text field; key edits save on Enter or leaving the box; a key rename is refused if any node of the type already has data under the new key; kind changes drop a default that doesn't fit (asking first); enum starts with "Option 1"; reorder with ↑/↓; "Add built-in…" re-adds starter types; the active type is used for "new nodes" (radio wording).
+- Resolved 2026-10-08: (P2-5 question) the developer chose (a): enum choices save when leaving the box and ask before dropping the default. Built.
+- **[DECISION]** (P2-5, approved 2026-10-08) New node types start with the Technology look and a `title` text field; key edits save on Enter or leaving the box; a key rename is refused if any node of the type already has data under the new key; kind changes drop a default that doesn't fit (asking first); enum starts with "Option 1"; reorder with ↑/↓; "Add built-in…" re-adds starter types; the active type is used for "new nodes" (radio wording).
 - **[DECISION]** (P2-4, approved 2026-10-08) Clicking a type in the Library opens it in the inspector and clears the canvas selection; selecting anything on the canvas closes it again; a Done button closes it too.
 - **[DECISION]** (P2-4, approved) A new edge type is created from a name (so its id reads well, D10), starts with the Prerequisite look, becomes the active type and opens for editing.
 - **[DECISION]** (P2-4, approved) The last edge type may be deleted if no edge uses it; connecting is then refused and the Library says to add one.
@@ -133,7 +146,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **[ASSUMPTION]** ESLint is used instead of the oxlint that the Vite template ships. Prettier ignores `*.md` and `src/model/__fixtures__`.
 
 ## Known rough edges (for later phases)
-- Node `data` values are not checked against their field kinds (DESIGN Phase 2 inspector).
+- Values that don't fit their field only get a warning badge in the inspector (D7); the card shows them as JSON.
 - "Add node" stacks new nodes diagonally near the center, so they overlap until dragged apart.
-- The document name (`meta.name`, also the save file name) can't be edited in the app yet. It stays "Untitled" unless the file says otherwise.
+- Field placements "tooltip" and "expanded" can be set but have no effect until DESIGN Phase 3.
+- Without undo, a deleted type, field or choice list can't be brought back (deletes ask first, D12).
 - No undo/redo yet (DESIGN Phase 5).
