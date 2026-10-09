@@ -3,13 +3,13 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Resume here (updated 2026-10-08, at a clean increment boundary)
-1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (378 tests at hand-off).
-2. Waiting on the developer: review and approve **P3-0 (tooltips)** at the gate.
-3. After approval, start **P3-1 (on-card dropdowns)** from `docs/PLAN-phase3.md`. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
+1. `git fetch && git checkout phase2 && git pull`, then `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (385 tests at hand-off).
+2. Waiting on the developer: review and approve **P3-1 (on-card dropdowns)** at the gate.
+3. After approval, start **P3-2 (expandable sections)** from `docs/PLAN-phase3.md`. Restate it, flag any new decisions, build, test, review loop, stop at the gate, and push.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server (Vite missed rewrites on this Windows machine several times). The browser pane's console log can show old errors from earlier edits; check timestamps.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8 and Q1–Q3 answered "not now"). **P3-0 (tooltips) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.**
+- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8 and Q1–Q3 answered "not now"). P3-0 (tooltips) was approved. **P3-1 (on-card dropdowns) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.**
 - DESIGN Phase 2 is complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2; everything after is only on `phase2`.
 
@@ -22,6 +22,12 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - 378 tests. In the browser with real input: a Cost field shown only in the tooltip; hover shows "Cost: 150" (after the delay, centred above the node); leaving hides it; same size when zoomed out; a click, a drag-and-drop and a double-click on the title each hide it.
   - Independent review, 3 rounds. Round 1 (no bugs): missing tests for "hidden while connecting" and for edits ending on unmount; a stuck hover on missing-type cards; tooltip returning instantly after a drag. Round 2 found **a bug**: `onMouseDown` never reached React on the card body (React Flow's drag handling stops it), so pressing didn't hide the tooltip in the real app; now `onPointerDown`, verified in the browser. Also: hidden NodeToolbars re-rendered on every pan/zoom (now mounted only when shown). Round 3: clean.
   - Known minor behaviour (accepted): hovering nodes while drawing a connection or panning with the button held starts their tooltip timers; after wheel-zooming without moving the mouse, a tooltip may stay until the mouse moves; very long tooltips are cut off at 240px without a fade; no keyboard/screen-reader access to tooltips yet; the native "Double-click to edit" hint can appear next to the tooltip.
+- **P3-1 on-card dropdowns:**
+  - `cardLines` gives enum lines `choices` (and `choice`) when the value is one of the choices or not set; a value that doesn't fit stays read-only text (D7).
+  - `CardEnumSelect.tsx`: a native `<select>` with "—" plus the choices; "—" removes the value. `nodrag nopan` and a stopped click keep React Flow from dragging, panning or selecting the node.
+  - 385 tests. In the browser with real input: a Branch choice field on Technology; picked "Military" on the card with a click, arrow keys and Enter, and the node wasn't selected or moved; with the node selected, Delete/Backspace in the dropdown left the node alone; card and inspector agreed.
+  - Independent review: 1 round, no bugs, no should-fixes. Applied a nit (dark colours for the open list). Noted, not changed: a hand-edited file with duplicate or empty choices gives a React key warning, or a choice that acts like "—" (the inspector already behaves the same); the mouse wheel over a closed dropdown zooms the canvas.
+
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.

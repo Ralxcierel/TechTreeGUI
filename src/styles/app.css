@@ -291,6 +291,30 @@ body,
   vertical-align: baseline;
 }
 
+/* A choice field on the card: a compact dropdown on the label's line. */
+.graph-node__select {
+  max-width: 100%;
+  font: inherit;
+  color: inherit;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+/* The open list is drawn by the system; give it the panel colours so it is never light-on-light. */
+.graph-node__select option {
+  color: var(--text);
+  background: var(--panel);
+}
+
+.graph-node__select:hover,
+.graph-node__select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .editable--empty {
   color: var(--text-muted);
   font-weight: normal;

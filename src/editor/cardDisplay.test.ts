@@ -117,3 +117,43 @@ describe('tooltipLines', () => {
     expect(tooltipLines(type([field('title', 'text', ['card'])]), {})).toEqual([])
   })
 })
+
+describe('cardLines: enum dropdowns', () => {
+  const type: NodeType = {
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields: [
+      { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
+      {
+        key: 'branch',
+        label: 'Branch',
+        kind: 'enum',
+        options: ['Industry', 'Science'],
+        show: ['card'],
+      },
+    ],
+  }
+  const branch = (values: Record<string, unknown>) => cardLines(type, values)[1]!
+
+  it('offers the choices with the current value', () => {
+    expect(branch({ branch: 'Science' })).toMatchObject({
+      choices: ['Industry', 'Science'],
+      choice: 'Science',
+    })
+  })
+
+  it('offers the choices with nothing chosen when the value is not set', () => {
+    const line = branch({})
+    expect(line.choices).toEqual(['Industry', 'Science'])
+    expect(line).not.toHaveProperty('choice')
+  })
+
+  it('keeps a value that is not a choice as read-only text', () => {
+    for (const value of ['Magic', 3, null]) {
+      const line = branch({ branch: value })
+      expect(line).not.toHaveProperty('choices')
+      expect(line.editable).toBe(false)
+    }
+  })
+})

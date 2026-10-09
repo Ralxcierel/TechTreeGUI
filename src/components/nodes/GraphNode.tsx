@@ -6,6 +6,7 @@ import { cardLines, EMPTY, tooltipLines } from '../../editor/cardDisplay'
 import { useEditorStore } from '../../editor/store'
 import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle } from '../../model'
+import { CardEnumSelect } from './CardEnumSelect'
 import { CardTooltip } from './CardTooltip'
 import { EditableText } from './EditableText'
 import { useHoverIntent } from './useHoverIntent'
@@ -23,6 +24,7 @@ const SIDE_POSITION: Record<string, Position> = {
 export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
   const setNodeField = useEditorStore((s) => s.setNodeField)
+  const removeNodeField = useEditorStore((s) => s.removeNodeField)
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -102,7 +104,16 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
           return (
             <div key={line.key} className={`graph-node__line graph-node__line--${line.kind}`}>
               <span className="graph-node__label">{line.label}: </span>
-              {line.editable ? (
+              {line.choices ? (
+                <CardEnumSelect
+                  label={line.label}
+                  choices={line.choices}
+                  value={line.choice}
+                  onChange={(v) =>
+                    v === undefined ? removeNodeField(id, line.key) : setNodeField(id, line.key, v)
+                  }
+                />
+              ) : line.editable ? (
                 <EditableText
                   className="graph-node__value"
                   label={line.label}

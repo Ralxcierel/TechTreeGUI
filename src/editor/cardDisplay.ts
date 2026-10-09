@@ -14,6 +14,13 @@ export interface CardLine {
   editable: boolean
   /** Raw string value for editing (only when `editable`). */
   editValue?: string
+  /**
+   * The choices of an enum field whose value is one of them (or not set): the card shows a
+   * dropdown. Left out when the value doesn't fit, so it stays read-only text (D7).
+   */
+  choices?: readonly string[]
+  /** The chosen value for the dropdown, or undefined for "—" (only with `choices`). */
+  choice?: string
 }
 
 export const EMPTY = '—'
@@ -71,6 +78,14 @@ export function cardLines(nodeType: NodeType, values: Record<string, unknown>): 
       editable,
     }
     if (editable) line.editValue = typeof value === 'string' ? value : ''
+    const options = field.options ?? []
+    if (
+      field.kind === 'enum' &&
+      (value === undefined || (typeof value === 'string' && options.includes(value)))
+    ) {
+      line.choices = options
+      if (value !== undefined) line.choice = value as string
+    }
     return line
   })
 }
