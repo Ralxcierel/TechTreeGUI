@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDef, NodeType } from '../model'
-import { cardLines, EMPTY, formatValue } from './cardDisplay'
+import { cardLines, EMPTY, formatValue, tooltipLines } from './cardDisplay'
 
 describe('formatValue', () => {
   it.each([
@@ -85,5 +85,35 @@ describe('cardLines', () => {
   it('reads only own data keys (no inherited properties)', () => {
     const t = type([field('toString', 'text')])
     expect(cardLines(t, {})[0]?.text).toBe(EMPTY)
+  })
+})
+
+describe('tooltipLines', () => {
+  const field = (key: string, kind: FieldDef['kind'], show: FieldDef['show']) =>
+    ({ key, label: key.toUpperCase(), kind, show }) as FieldDef
+  const type = (fields: FieldDef[]): NodeType => ({
+    id: 't',
+    name: 'T',
+    style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    fields,
+  })
+
+  it('lists only fields marked tooltip, in order, labelled, with lists in full', () => {
+    const t = type([
+      field('title', 'text', ['card']),
+      field('cost', 'number', ['card', 'tooltip']),
+      field('tags', 'list', ['tooltip']),
+      field('done', 'boolean', ['tooltip']),
+    ])
+    const lines = tooltipLines(t, { title: 'Fire', cost: 5, tags: ['a', 'b', 'c', 'd'] })
+    expect(lines.map((l) => [l.key, l.label, l.text])).toEqual([
+      ['cost', 'COST', '5'],
+      ['tags', 'TAGS', 'a, b, c, d'],
+      ['done', 'DONE', EMPTY],
+    ])
+  })
+
+  it('is empty when no field is marked tooltip', () => {
+    expect(tooltipLines(type([field('title', 'text', ['card'])]), {})).toEqual([])
   })
 })

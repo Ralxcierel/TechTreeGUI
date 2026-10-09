@@ -572,3 +572,32 @@ body,
   gap: 4px;
   font-size: 13px;
 }
+
+/* Node tooltips (fields marked "tooltip"). Never in the way: the pointer passes through them. */
+.card-tooltip-anchor {
+  pointer-events: none;
+}
+
+.card-tooltip {
+  max-width: 280px;
+  /* Long lists or rich text are cut off rather than covering the canvas (it can't scroll). */
+  max-height: 240px;
+  overflow: hidden;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
+}
+
+.card-tooltip__label {
+  color: var(--text-muted);
+}
+
+.card-tooltip__value {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}

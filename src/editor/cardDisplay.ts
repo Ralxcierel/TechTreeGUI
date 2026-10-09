@@ -20,7 +20,11 @@ export const EMPTY = '—'
 const LIST_ITEMS_SHOWN = 3
 
 /** Display text for a field value. Values that don't fit the field kind are shown as raw JSON. */
-export function formatValue(kind: FieldKind, value: unknown): string {
+export function formatValue(
+  kind: FieldKind,
+  value: unknown,
+  listItems: number = LIST_ITEMS_SHOWN,
+): string {
   if (value === undefined || value === null) return EMPTY
   if (typeof value === 'string' && value.trim() === '') return EMPTY
   switch (kind) {
@@ -42,10 +46,10 @@ export function formatValue(kind: FieldKind, value: unknown): string {
       if (Array.isArray(value)) {
         if (value.length === 0) return EMPTY
         const shown = value
-          .slice(0, LIST_ITEMS_SHOWN)
+          .slice(0, listItems)
           .map((v) => (typeof v === 'string' ? v : JSON.stringify(v)))
           .join(', ')
-        const more = value.length - LIST_ITEMS_SHOWN
+        const more = value.length - listItems
         return more > 0 ? `${shown} +${more} more` : shown
       }
       break
@@ -69,4 +73,30 @@ export function cardLines(nodeType: NodeType, values: Record<string, unknown>): 
     if (editable) line.editValue = typeof value === 'string' ? value : ''
     return line
   })
+}
+
+/** One `Label: value` line of a node's tooltip. */
+export interface TooltipLine {
+  key: string
+  label: string
+  kind: FieldKind
+  text: string
+}
+
+/**
+ * What a node's tooltip shows: one line per field marked `tooltip`, in the type's field order.
+ * Lists are shown in full (there is more room than on the card). Empty when there are none.
+ */
+export function tooltipLines(nodeType: NodeType, values: Record<string, unknown>): TooltipLine[] {
+  return nodeType.fields
+    .filter((f) => f.show.includes('tooltip'))
+    .map((field) => {
+      const value = Object.hasOwn(values, field.key) ? values[field.key] : undefined
+      return {
+        key: field.key,
+        label: field.label,
+        kind: field.kind,
+        text: formatValue(field.kind, value, Infinity),
+      }
+    })
 }

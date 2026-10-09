@@ -1,6 +1,6 @@
 # Plan — DESIGN Phase 3: rich node content
 
-> Status: **draft, waiting for the developer's approval.** Scope source: `docs/DESIGN.md` §5 Phase 3,
+> Status: **approved by the developer (2026-10-08)**, with D1–D8 and the recommended answers to Q1–Q3 (all "not now"). Scope source: `docs/DESIGN.md` §5 Phase 3,
 > plus the Phase 3 notes in `docs/PLAN-phase2.md` §5 (named handles; a floating end should aim at a
 > fixed handle). Progress is tracked in `PROGRESS.md`.
 

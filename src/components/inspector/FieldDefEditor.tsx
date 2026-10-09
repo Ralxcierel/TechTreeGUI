@@ -216,7 +216,7 @@ export function FieldDefEditor(props: FieldDefEditorProps) {
             </label>
           ))}
         </div>
-        <span className="inspector__note">Tooltip and expanded views arrive in Phase 3.</span>
+        <span className="inspector__note">The expanded view arrives later in Phase 3.</span>
       </div>
     </fieldset>
   )
