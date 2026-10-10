@@ -3,15 +3,15 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Resume here (session ended 2026-10-09, at a clean increment boundary)
-1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (479 tests at hand-off).
-2. Waiting on the developer: review and approve **P3-4 (named handles, schema v3)** at the gate.
-3. After approval, start **P3-5, the Phase 3 gate** from `docs/PLAN-phase3.md`: an automated "done when" test at store level (like `src/editor/phase2.acceptance.test.ts`) covering the tooltip, the on-card dropdown, the expanded section, the icon, In/Out handles with an Out → In edge that stays attached while a floating edge attaches to the facing side, and save → reload → load giving an identical graph; then a hand check in the browser with a screenshot; then PROGRESS.
+1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (480 tests at hand-off).
+2. Waiting on the developer: review **P3-5 (the Phase 3 gate)** and approve **DESIGN Phase 3 as complete**.
+3. After approval, the next step is planning **DESIGN Phase 4 (tech-tree features)**: tiers/lanes, validation (cycles, orphans), auto-layout (would need a new dependency such as elkjs or dagre, to be confirmed), play mode, layout direction (schema change), radial trees. Per the global workflow, write a walking-skeleton plan `docs/PLAN-phase4.md` with [DECISION]/[ASSUMPTION]/[QUESTION] items and stop for approval before building.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
 5. Shell gotcha (hit again on 2026-10-09): in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script. Prefer the Edit/Write tools for lines that contain escapes, and re-read the result.
 6. Browser pane gotcha: after `resize_window` to e.g. 1100×750 the page lays out at that size, but screenshots come out shrunk into a corner. Pointer input still works: screenshot-frame coordinates × (page width / 800) = page coordinates. Read positions with JavaScript (`getBoundingClientRect`) and click by `ref` where you can. At the pane's own size (about 400px wide) the canvas has no room.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 to P3-3 are approved (P3-3 on 2026-10-09). **P3-4 (named handles) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.** Still to do: P3-5 (gate).
+- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 to P3-4 are approved (P3-3 and P3-4 on 2026-10-09; the developer chose to keep the "no side dot under a centred named handle" behaviour). **P3-5 (the gate) is done, committed and pushed on `phase2`, waiting for approval of Phase 3 as complete.**
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
@@ -97,6 +97,23 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
     - A stored unknown id and null both float, but count as different edges for the duplicate rule.
     - Fixed edge ends attach at the handle's outer edge (React Flow's normal behaviour), about 5px outside the card.
     - Where a named handle covers the middle of a side, that side has no generic dot; floating edges can use the other sides.
+
+- **P3-5 Phase 3 gate:**
+  - `src/editor/phase3.acceptance.test.ts` automates the plan's "done when" through the store actions and card helpers the UI uses:
+    1. Technology gets Cost (number, tooltip), Branch (enum, card), Details (rich text, expanded) and a ⚙ icon.
+    2. The tooltip lines are only "Cost: 150"; Branch is a dropdown and changes to Military; Details is only in the expanded section; the card expands and collapses.
+    3. In (left, in) and Out (right, out) handles; Out → In stays on both handles after the nodes move; a floating edge attaches to the facing sides.
+    4. Save, reset the store, load: deep-equal and byte-identical, handles and handle ids included.
+  - An independent review of the test found no bugs; its comment fixes were applied (the drawn anchor is half a dot outside the card; the first check before the move can't tell fixed from floating, the one after can).
+  - **Hand check in the browser (1100×750 emulation), with real mouse and keyboard except where noted:**
+    - In the Technology type editor: typed the ⚙ icon; added Cost (number, Tooltip only), Branch (choice: Science, Military) and Details (rich text, Expanded only); added handles In (left, in) and Out (right, out). Kinds, sides and directions were set with `form_input` on the selects.
+    - Added 3 nodes and dragged them apart; set node A's Cost (150) and Details in the inspector.
+    - Hovering A showed the tooltip "Cost: 150".
+    - With nothing selected, picked Military in A's on-card dropdown (click, arrow keys, Enter): the value changed, the node stayed unselected and the inspector stayed on Document.
+    - "▸ More" opened Details ("Unlocks bronze tools."), the card grew from 90 to 117 px; "▾ Less" closed it again.
+    - Drew A.Out → B.In and a floating edge from A's bottom dot to C's top dot; moved B and C: the Out → In edge stayed on B's In handle, the floating edge stayed on the facing sides.
+    - **Save → reload → Load:** Save's download was caught in the page and handed to the Load input with JavaScript (the OS file picker can't be driven); the app's real Save and Load handlers ran. After the reload: same node ids, positions, card text, edge paths and pan/zoom, Branch still Military, no error banner, no console errors. The saved file is schema v3 with both handles and the edge's `out`/`in` ids.
+    - Screenshot taken (low resolution because of the pane's emulation bug; shown in the session, not stored in the repo).
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
