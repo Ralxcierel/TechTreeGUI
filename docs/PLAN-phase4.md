@@ -1,6 +1,7 @@
 # Plan — DESIGN Phase 4: tech-tree features
 
-> Status: **draft, waiting for the developer's approval** (2026-10-09). Scope source:
+> Status: **approved by the developer (2026-10-10)**: D1–D12 and the recommended answers to Q1–Q5
+> (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Scope source:
 > `docs/DESIGN.md` §5 Phase 4. Progress is tracked in `PROGRESS.md`.
 
 ## 1. Goal and "done when"
