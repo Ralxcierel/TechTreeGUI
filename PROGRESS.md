@@ -2,20 +2,23 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (session ended 2026-10-09, at a clean increment boundary)
+## Resume here (session ended 2026-10-09, at a clean phase boundary)
 1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (480 tests at hand-off).
-2. Waiting on the developer: review **P3-5 (the Phase 3 gate)** and approve **DESIGN Phase 3 as complete**.
-3. After approval, the next step is planning **DESIGN Phase 4 (tech-tree features)**: tiers/lanes, validation (cycles, orphans), auto-layout (would need a new dependency such as elkjs or dagre, to be confirmed), play mode, layout direction (schema change), radial trees. Per the global workflow, write a walking-skeleton plan `docs/PLAN-phase4.md` with [DECISION]/[ASSUMPTION]/[QUESTION] items and stop for approval before building.
+2. **Waiting on the developer: approve the DESIGN Phase 4 plan, `docs/PLAN-phase4.md` (draft, committed for review, not yet approved).** Present it again briefly and get answers to D1–D12 and Q1–Q5 (listed verbatim under "Open items" below). The developer can answer item by item or "recommended for all". Nothing of Phase 4 is built yet.
+3. After approval: mark the plan approved (status line, plus any changed decisions), commit and push it, then start **P4-0 (skeleton: prerequisite cycles → Problems panel → marked cards)**. Restate it first, flag new decisions, build → test → self-review → independent review loop (max 3 rounds) → stop at the gate → push.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
 5. Shell gotcha (hit again on 2026-10-09): in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script. Prefer the Edit/Write tools for lines that contain escapes, and re-read the result.
 6. Browser pane gotcha: after `resize_window` to e.g. 1100×750 the page lays out at that size, but screenshots come out shrunk into a corner. Pointer input still works: screenshot-frame coordinates × (page width / 800) = page coordinates. Read positions with JavaScript (`getBoundingClientRect`) and click by `ref` where you can. At the pane's own size (about 400px wide) the canvas has no room.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 to P3-4 are approved (P3-3 and P3-4 on 2026-10-09; the developer chose to keep the "no side dot under a centred named handle" behaviour). **P3-5 (the gate) is done, committed and pushed on `phase2`, waiting for approval of Phase 3 as complete.**
+- **DESIGN Phase 4 (tech-tree features): planning.** `docs/PLAN-phase4.md` is a draft waiting for approval (written 2026-10-09). Summary:
+  - Skeleton P4-0: cycle detection on prerequisite edges → Problems panel → marked cards (no schema change).
+  - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
+- **DESIGN Phase 3 is complete and approved** (2026-10-09). Plan `docs/PLAN-phase3.md`; all of P3-0 to P3-5 approved. The developer chose to keep the "no generic side dot under a centred named handle" behaviour from P3-4.
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
-## Done (DESIGN Phase 3 so far)
+## Done (DESIGN Phase 3, complete)
 - **P3-0 tooltips:**
   - `tooltipLines` in `src/editor/cardDisplay.ts`: one `Label: value` line per field marked `tooltip`, formatted like the card, lists in full.
   - `src/components/nodes/useHoverIntent.ts` (show after a delay, hide at once) and `CardTooltip.tsx`. `GraphNode` shows the tooltip in React Flow's `NodeToolbar` (outside the card, same size at any zoom), mounted only while shown, 400 ms after the pointer rests on the node.
@@ -115,7 +118,7 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
     - **Save → reload → Load:** Save's download was caught in the page and handed to the Load input with JavaScript (the OS file picker can't be driven); the app's real Save and Load handlers ran. After the reload: same node ids, positions, card text, edge paths and pan/zoom, Branch still Military, no error banner, no console errors. The saved file is schema v3 with both handles and the edge's `out`/`in` ids.
     - Screenshot taken (low resolution because of the pane's emulation bug; shown in the session, not stored in the repo).
 
-## Done (DESIGN Phase 2 so far)
+## Done (DESIGN Phase 2, complete)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
 - **P2-0 inspector skeleton:**
   - A right-hand panel (`src/components/inspector/`). Nothing selected → rename the document (also the save file name) and see counts. One node → its type name and an input for each text field, updated on every keystroke. Anything else → a summary.
@@ -220,6 +223,101 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
+### Phase 4 plan: waiting for the developer (copied verbatim from `docs/PLAN-phase4.md` §4–6)
+
+**Decisions to confirm:**
+
+- **[DECISION] D1 — Auto-layout is hand-written, no new dependency.** A layered ("Sugiyama-style")
+  layout: ranks from prerequisite depth and tiers, a few ordering sweeps to reduce crossings, even
+  spacing. Reasons: dagre can't force nodes into tiers (rank constraints aren't supported); elkjs
+  can (layer partitions) but is ~1.4 MB and asynchronous; neither does the radial layout as
+  described (angular slices sized by subtree), so that part is custom anyway. If the hand-written
+  crossing reduction isn't good enough, elkjs can be proposed later as a separate decision.
+- **[DECISION] D2 — What counts as a prerequisite edge:** any edge whose type's Meaning is
+  `prerequisite` (trimmed, any letter case). The starter "Prerequisite" type already has it. The
+  edge type editor gets a one-line hint under Meaning. Direction: source before target.
+- **[DECISION] D3 — Which nodes are part of the tree** (for orphans, play mode and layout): nodes
+  of any node type that appears at either end of at least one prerequisite edge in the document.
+  No new setting; a Note never connected by prerequisites is never flagged. (See Q1 for an
+  explicit per-type flag instead.)
+- **[DECISION] D4 — Prerequisites are AND:** a node becomes available when *all* its prerequisites
+  are unlocked. Roots (no prerequisites) start available. OR-groups are out of scope (Q2).
+- **[DECISION] D5 — Schema v4:**
+  ```jsonc
+  "layout": {
+    "direction": "down",          // "down" | "up" | "left" | "right" | "radial"
+    "spacing": 250,               // distance between layers / lanes / rings (positive)
+    "tiers": [{ "id": "ancient", "name": "Ancient" }]   // order = lane / ring order
+  },
+  "nodes": [{ ..., "tierId": "ancient" }]               // optional, null = no tier
+  ```
+  New top-level `layout` object (after `edges`, before `view`); migration v3 → v4 adds
+  `{ direction: "down", spacing: 250, tiers: [] }`; `tierId` is optional (missing = null). A
+  `tierId` that names no tier loads, is shown as "unknown tier" and is treated as no tier. Tier ids
+  are made from the name like type ids (D10 of Phase 2) and never change on rename.
+- **[DECISION] D6 — Cost for the running total:** the number field with key `cost` on each node's
+  type; nodes without it (or with a non-number value) count as 0. (See Q3 for a configurable field.)
+- **[DECISION] D7 — Play mode behaviour:** editor-only (never saved, like the expanded state).
+  The canvas can pan and zoom but not drag, connect, delete or edit; the inspector shows the
+  clicked node read-only. Clicking an available node unlocks it; clicking an unlocked node
+  re-locks it and every node that depends on it. Nodes outside the tree (D3) are dimmed and
+  ignored. Nodes in or behind a cycle are shown as "blocked". Leaving play mode (or loading a file)
+  clears the unlocked set.
+- **[DECISION] D8 — Validation never blocks editing.** Cycles stay allowed (rule S7); they're
+  reported live in the Problems panel and on the canvas. The panel is a collapsible section below
+  the Library on the left.
+- **[DECISION] D9 — Lane geometry (linear):** lanes start at 0 on the main axis and are `spacing`
+  wide, one per tier in order: `down` → horizontal bands going down from y = 0; `up` → going up;
+  `right` → vertical bands going right from x = 0; `left` → going left. They extend far along the
+  cross axis. Dropping a node snaps its centre to the middle of the lane under its centre and sets
+  `tierId`; dropping beyond the last lane (or before the first) clears it and doesn't snap.
+- **[DECISION] D10 — Auto-layout asks first and moves only tree nodes** (D3), because there is no
+  undo until Phase 5: "Auto-layout moves N nodes. This can't be undone. Continue?" Other nodes
+  (notes) stay where they are. Afterwards the view fits the tree.
+- **[DECISION] D11 — Tiers in auto-layout:** each node gets a rank: a tiered node's rank is its
+  tier's index; an untiered node's rank is one more than the highest rank among its prerequisites
+  (0 for roots). With tiers defined, rank k is placed in lane k (ranks past the last tier continue
+  as extra, unnamed layers). Nodes sharing a rank are spread along the cross axis. Consequence: a
+  prerequisite chain inside one tier sits side by side in that lane, not in sub-rows.
+- **[DECISION] D12 — Radial geometry:** the centre is the flow origin (0, 0). Rank k sits on the
+  ring of radius k × spacing; with several roots, rank 0 is a small ring instead of a point. Each
+  node follows one "primary" prerequisite (the first in edge order, with a lower rank), which makes
+  a tree; each subtree gets an angular slice proportional to its number of leaves. With tiers,
+  tier k matches rank k (D11): the first tier is the centre disc (radius below spacing / 2) and
+  tier k is the ring band from (k − ½) to (k + ½) × spacing, drawn as concentric circles. Snapping
+  keeps the node's angle and moves it onto radius k × spacing.
+
+**Assumptions:**
+
+- **[ASSUMPTION]** Problems are recomputed live after every change; even 500-node trees are cheap
+  (linear-time graph passes).
+- **[ASSUMPTION]** Clicking a problem selects the affected nodes and pans the view to them.
+- **[ASSUMPTION]** Changing the direction (or spacing) redraws the lanes but doesn't move any
+  node; run Auto-layout to rearrange.
+- **[ASSUMPTION]** Removing a tier asks first and clears `tierId` on its nodes (nodes stay put).
+- **[ASSUMPTION]** Auto-layout uses each node's measured size; a node not measured yet counts as
+  its type's width × 60 px.
+- **[ASSUMPTION]** Card colours for play states: locked = dimmed, available = accent outline,
+  unlocked = filled check mark, blocked = error outline. Exact styling is a detail of P4-2.
+
+**Questions:**
+
+- **[QUESTION] Q1:** Should "part of the tree" be an explicit checkbox per node type ("Part of
+  the tech tree", schema v4), instead of the inference in D3? Recommendation: inference now (zero
+  setup); add the flag later if the inference surprises you.
+- **[QUESTION] Q2:** Any need for OR prerequisites ("needs A *or* B") in play mode? Recommendation:
+  not in Phase 4 (D4).
+- **[QUESTION] Q3:** Should the cost field be configurable (pick any number field), or is the
+  `cost` key convention enough? Recommendation: the convention (D6) for now.
+- **[QUESTION] Q4:** Should tiers be linked to Era *nodes* (the starter Era type), e.g. each Era
+  node defines a tier? Recommendation: no; tiers are a separate document-level list (D5), and Era
+  nodes stay ordinary nodes (a natural radial centre).
+- **[QUESTION] Q5:** Should validation also warn when a prerequisite sits in a *later* tier than
+  the node it unlocks (e.g. a Medieval prerequisite for an Ancient tech)? Recommendation: yes, as a
+  small addition to P4-4 once tiers exist; it's cheap and catches real design mistakes. Say no to
+  keep strictly to the brief.
+
+### Earlier items
 - Resolved 2026-10-08: (P2-5 question) the developer chose (a): enum choices save when leaving the box and ask before dropping the default. Built.
 - **[DECISION]** (P2-5, approved 2026-10-08) New node types start with the Technology look and a `title` text field; key edits save on Enter or leaving the box; a key rename is refused if any node of the type already has data under the new key; kind changes drop a default that doesn't fit (asking first); enum starts with "Option 1"; reorder with ↑/↓; "Add built-in…" re-adds starter types; the active type is used for "new nodes" (radio wording).
 - **[DECISION]** (P2-4, approved 2026-10-08) Clicking a type in the Library opens it in the inspector and clears the canvas selection; selecting anything on the canvas closes it again; a Done button closes it too.
