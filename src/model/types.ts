@@ -1,7 +1,7 @@
-// Graph document schema, version 3. See docs/PLAN.md §1.
+// Graph document schema, version 4. See docs/PLAN.md §1.
 // Pure data types: no React or UI imports anywhere in src/model/.
 
-export const CURRENT_SCHEMA_VERSION = 3
+export const CURRENT_SCHEMA_VERSION = 4
 
 export type FieldKind = 'text' | 'number' | 'enum' | 'boolean' | 'list' | 'richtext' | 'image'
 export type FieldPlacement = 'card' | 'tooltip' | 'expanded'
@@ -82,6 +82,11 @@ export interface GraphNode {
   position: Position
   data: Record<string, unknown>
   styleOverrides: Partial<NodeStyle>
+  /**
+   * The tier (era) the node belongs to, or null (schema v4, decision D5 of Phase 4). An id that
+   * names no tier is kept, and treated as no tier.
+   */
+  tierId: string | null
 }
 
 export interface GraphEdge {
@@ -99,6 +104,32 @@ export interface Viewport {
   zoom: number
 }
 
+/** Which way a tech tree grows (schema v4): linear directions, or rings around a centre. */
+export type LayoutDirection = 'down' | 'up' | 'left' | 'right' | 'radial'
+
+export const LAYOUT_DIRECTIONS: readonly LayoutDirection[] = [
+  'down',
+  'up',
+  'left',
+  'right',
+  'radial',
+]
+
+/** A tier (era): a lane in linear layouts, a ring in radial ones. Its id never changes. */
+export interface Tier {
+  id: string
+  name: string
+}
+
+/** The document's layout settings (schema v4, decision D5 of Phase 4). */
+export interface LayoutSettings {
+  direction: LayoutDirection
+  /** Distance between layers, lanes or rings, in flow units (positive). */
+  spacing: number
+  /** In lane / ring order. */
+  tiers: Tier[]
+}
+
 export interface DocumentMeta {
   name: string
   created: string
@@ -112,5 +143,6 @@ export interface GraphDocument {
   edgeTypes: EdgeType[]
   nodes: GraphNode[]
   edges: GraphEdge[]
+  layout: LayoutSettings
   view: { viewport: Viewport }
 }

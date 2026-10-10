@@ -33,7 +33,14 @@ export function addNode(
     }
   }
 
-  const node: GraphNode = { id, typeId, position: { ...position }, data, styleOverrides: {} }
+  const node: GraphNode = {
+    id,
+    typeId,
+    position: { ...position },
+    data,
+    styleOverrides: {},
+    tierId: null,
+  }
   return { ...doc, nodes: [...doc.nodes, node] }
 }
 

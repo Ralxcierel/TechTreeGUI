@@ -107,3 +107,23 @@ describe('v2 → v3', () => {
     expect(v2ToV3({ schemaVersion: 2 })).toEqual({ schemaVersion: 3 })
   })
 })
+
+describe('v3 → v4', () => {
+  const v3ToV4 = MIGRATIONS[3]!
+
+  it('adds the default layout settings, keeping everything else', () => {
+    const input = { schemaVersion: 3, extra: 'kept', nodes: [{ id: 'a' }] }
+    expect(v3ToV4(input)).toEqual({
+      schemaVersion: 4,
+      extra: 'kept',
+      nodes: [{ id: 'a' }],
+      layout: { direction: 'down', spacing: 250, tiers: [] },
+    })
+    expect(input.schemaVersion).toBe(3)
+    expect('layout' in input).toBe(false)
+  })
+
+  it('keeps a layout that is already there (the validator checks it)', () => {
+    expect(v3ToV4({ schemaVersion: 3, layout: 'odd' })).toEqual({ schemaVersion: 4, layout: 'odd' })
+  })
+})

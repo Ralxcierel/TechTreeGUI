@@ -8,6 +8,7 @@ import {
   addNode,
   addStarterEdgeType,
   addStarterNodeType,
+  addTier,
   connect,
   connectionError,
   createEdgeType,
@@ -20,15 +21,21 @@ import {
   toggleUnlocked,
   moveField,
   moveHandle,
+  moveTier,
   orientEnds,
   removeField,
   removeHandle,
   removeNodeData,
+  removeTier,
   renameDocument,
   renameFieldKey,
   renameHandleId,
+  renameTier,
   setFieldDefault,
   setEdgeType,
+  setLayoutDirection,
+  setLayoutSpacing,
+  setNodeTier,
   setStyleOverride,
   setViewport,
   updateEdgeType,
@@ -44,6 +51,7 @@ import {
   type NodeTypePatch,
   type TypeOpResult,
   type GraphDocument,
+  type LayoutDirection,
   type TreeProblem,
   type PlayState,
   type NodeStyle,
@@ -155,6 +163,18 @@ interface EditorState {
   ) => void
   /** Changes an edge's type. Returns why not, or null when it worked. */
   setEdgeType: (edgeId: string, typeId: string) => string | null
+  /** Layout settings (schema v4): the direction trees grow in. */
+  setLayoutDirection: (direction: LayoutDirection) => void
+  /** Distance between layers, lanes or rings; values that aren't positive numbers are ignored. */
+  setLayoutSpacing: (spacing: number) => void
+  /** Adds a tier at the end. Returns its id (made from the name). */
+  addTier: (name: string) => string
+  renameTier: (tierId: string, name: string) => void
+  moveTier: (tierId: string, by: -1 | 1) => void
+  /** Removes a tier; its nodes lose their tier but don't move. */
+  removeTier: (tierId: string) => void
+  /** Puts a node in a tier, or in none with null. */
+  setNodeTier: (nodeId: string, tierId: string | null) => void
   /** Renames the document (also the save file name). */
   setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
@@ -490,6 +510,19 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       set((s) => derive(s, result.doc, s.ui))
       return null
     },
+    setLayoutDirection: (direction) =>
+      set((s) => derive(s, setLayoutDirection(s.doc, direction), s.ui)),
+    setLayoutSpacing: (spacing) => set((s) => derive(s, setLayoutSpacing(s.doc, spacing), s.ui)),
+    addTier: (name) => {
+      const { doc, id } = addTier(get().doc, name)
+      set((s) => derive(s, doc, s.ui))
+      return id
+    },
+    renameTier: (tierId, name) => set((s) => derive(s, renameTier(s.doc, tierId, name), s.ui)),
+    moveTier: (tierId, by) => set((s) => derive(s, moveTier(s.doc, tierId, by), s.ui)),
+    removeTier: (tierId) => set((s) => derive(s, removeTier(s.doc, tierId), s.ui)),
+    setNodeTier: (nodeId, tierId) =>
+      set((s) => derive(s, setNodeTier(s.doc, nodeId, tierId), s.ui)),
     setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
     loadDocument: (doc) =>
       set((s) => {

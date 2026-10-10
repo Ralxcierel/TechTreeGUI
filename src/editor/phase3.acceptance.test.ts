@@ -11,7 +11,7 @@
 // GraphNode component tests.)
 import { Position } from '@xyflow/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { parseDocument, serialize, type GraphNode } from '../model'
+import { CURRENT_SCHEMA_VERSION, parseDocument, serialize, type GraphNode } from '../model'
 import { cardLines, expandedLines, tooltipLines } from './cardDisplay'
 import { chooseEnds } from './edgePath'
 import { handleIdsByNode, toFlowEdges } from './flowAdapter'
@@ -160,7 +160,7 @@ describe('Phase 3 acceptance', () => {
     const { doc } = s()
     expect(doc).toEqual(saved)
     expect(serialize(doc)).toBe(file)
-    expect(doc.schemaVersion).toBe(3)
+    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
     expect(techType().handles).toEqual([
       { id: 'in', label: 'In', side: 'left', offset: 0.5, direction: 'in' },
       { id: 'out', label: 'Out', side: 'right', offset: 0.5, direction: 'out' },

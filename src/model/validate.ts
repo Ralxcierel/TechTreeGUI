@@ -10,6 +10,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   HANDLE_DIRECTIONS,
   HANDLE_SIDES,
+  LAYOUT_DIRECTIONS,
   type DocumentMeta,
   type EdgePath,
   type EdgeStyle,
@@ -21,8 +22,10 @@ import {
   type GraphEdge,
   type GraphNode,
   type HandleDef,
+  type LayoutSettings,
   type NodeStyle,
   type NodeType,
+  type Tier,
   type Viewport,
 } from './types'
 
@@ -348,7 +351,9 @@ function readNode(r: Reader, value: unknown, path: string): GraphNode | undefine
   const overridesObj = r.optionalObject(o, 'styleOverrides', path)
   const styleOverrides =
     overridesObj && readStyleOverrides(r, overridesObj, `${path}.styleOverrides`)
+  const tierId = r.nullableString(o, 'tierId', path)
   if (
+    tierId === undefined ||
     id === undefined ||
     typeId === undefined ||
     x === undefined ||
@@ -358,7 +363,7 @@ function readNode(r: Reader, value: unknown, path: string): GraphNode | undefine
   ) {
     return undefined
   }
-  return { ...o, id, typeId, position: { ...pos, x, y }, data, styleOverrides }
+  return { ...o, id, typeId, position: { ...pos, x, y }, data, styleOverrides, tierId }
 }
 
 function readEdge(r: Reader, value: unknown, path: string): GraphEdge | undefined {
@@ -381,6 +386,25 @@ function readEdge(r: Reader, value: unknown, path: string): GraphEdge | undefine
     return undefined
   }
   return { ...o, id, typeId, source, target, sourceHandle, targetHandle }
+}
+
+function readTier(r: Reader, value: unknown, path: string): Tier | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  const id = r.id(o, 'id', path)
+  const name = r.string(o, 'name', path)
+  if (id === undefined || name === undefined) return undefined
+  return { ...o, id, name }
+}
+
+function readLayout(r: Reader, value: unknown): LayoutSettings | undefined {
+  const o = r.object(value, 'layout')
+  if (!o) return undefined
+  const direction = r.oneOf(o, 'direction', 'layout', LAYOUT_DIRECTIONS)
+  const spacing = r.positive(o, 'spacing', 'layout')
+  const tiers = r.items(o.tiers, 'layout.tiers', (v, p) => readTier(r, v, p))
+  if (direction === undefined || spacing === undefined || !tiers) return undefined
+  return { ...o, direction, spacing, tiers }
 }
 
 function readView(r: Reader, value: unknown): GraphDocument['view'] | undefined {
@@ -418,6 +442,11 @@ function checkIntegrity(r: Reader, doc: GraphDocument): void {
     'edges',
     'id',
   )
+  r.unique(
+    doc.layout.tiers.map((t) => t.id),
+    'layout.tiers',
+    'id',
+  )
 
   const nodeTypeIds = new Set(doc.nodeTypes.map((t) => t.id))
   doc.nodes.forEach((n, i) => {
@@ -452,9 +481,19 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
   const edgeTypes = r.items(raw.edgeTypes, 'edgeTypes', (v, p) => readEdgeType(r, v, p))
   const nodes = r.items(raw.nodes, 'nodes', (v, p) => readNode(r, v, p))
   const edges = r.items(raw.edges, 'edges', (v, p) => readEdge(r, v, p))
+  const layout = readLayout(r, raw.layout)
   const view = readView(r, raw.view)
 
-  if (r.errors.length > 0 || !meta || !nodeTypes || !edgeTypes || !nodes || !edges || !view) {
+  if (
+    r.errors.length > 0 ||
+    !meta ||
+    !nodeTypes ||
+    !edgeTypes ||
+    !nodes ||
+    !edges ||
+    !layout ||
+    !view
+  ) {
     return { ok: false, errors: r.errors }
   }
 
@@ -466,6 +505,7 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
     edgeTypes,
     nodes,
     edges,
+    layout,
     view,
   }
   checkIntegrity(r, doc)

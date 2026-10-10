@@ -1,5 +1,11 @@
 import { newDocumentTypes, STARTER_EDGE_TYPES, STARTER_NODE_TYPES } from './starters'
-import { CURRENT_SCHEMA_VERSION, type EdgeType, type GraphDocument, type NodeType } from './types'
+import {
+  CURRENT_SCHEMA_VERSION,
+  type EdgeType,
+  type GraphDocument,
+  type LayoutSettings,
+  type NodeType,
+} from './types'
 
 /** The starter node type `defaultNodeType()` copies (also the style new node types start with). */
 export const DEFAULT_NODE_TYPE_ID = 'technology'
@@ -20,6 +26,11 @@ export function defaultEdgeType(): EdgeType {
   return starter(STARTER_EDGE_TYPES, DEFAULT_EDGE_TYPE_ID)
 }
 
+/** Layout settings of a new document, and of documents saved before schema v4. */
+export function defaultLayout(): LayoutSettings {
+  return { direction: 'down', spacing: 250, tiers: [] }
+}
+
 export function createEmptyDocument(name = 'Untitled', now = new Date()): GraphDocument {
   const timestamp = now.toISOString()
   return {
@@ -28,6 +39,7 @@ export function createEmptyDocument(name = 'Untitled', now = new Date()): GraphD
     ...newDocumentTypes(),
     nodes: [],
     edges: [],
+    layout: defaultLayout(),
     view: { viewport: { x: 0, y: 0, zoom: 1 } },
   }
 }

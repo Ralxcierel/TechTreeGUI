@@ -25,10 +25,20 @@ function v2ToV3(doc: RawDocument): RawDocument {
   return { ...doc, nodeTypes, schemaVersion: 3 }
 }
 
+/**
+ * v3 → v4: documents gain `layout` (direction, spacing, tiers; decision D5 of Phase 4) with the
+ * defaults. Nodes need nothing: a missing `tierId` loads as "no tier".
+ */
+function v3ToV4(doc: RawDocument): RawDocument {
+  if ('layout' in doc) return { ...doc, schemaVersion: 4 }
+  return { ...doc, layout: { direction: 'down', spacing: 250, tiers: [] }, schemaVersion: 4 }
+}
+
 /** Keyed by the version a migration upgrades *from*. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: v1ToV2,
   2: v2ToV3,
+  3: v3ToV4,
 }
 
 export type MigrateResult = { ok: true; doc: RawDocument } | { ok: false; error: string }

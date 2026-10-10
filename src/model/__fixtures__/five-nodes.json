@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "meta": {
     "name": "Five Node Tree",
     "created": "2026-10-01T12:00:00.000Z",
@@ -55,7 +55,8 @@
       "data": {
         "title": "Fire"
       },
-      "styleOverrides": {}
+      "styleOverrides": {},
+      "tierId": null
     },
     {
       "id": "n_pottery",
@@ -67,7 +68,8 @@
       "data": {
         "title": "Pottery"
       },
-      "styleOverrides": {}
+      "styleOverrides": {},
+      "tierId": null
     },
     {
       "id": "n_bronze",
@@ -79,7 +81,8 @@
       "data": {
         "title": "Bronze Working"
       },
-      "styleOverrides": {}
+      "styleOverrides": {},
+      "tierId": null
     },
     {
       "id": "n_writing",
@@ -91,7 +94,8 @@
       "data": {
         "title": "Writing"
       },
-      "styleOverrides": {}
+      "styleOverrides": {},
+      "tierId": null
     },
     {
       "id": "n_iron",
@@ -103,7 +107,8 @@
       "data": {
         "title": "Iron Working"
       },
-      "styleOverrides": {}
+      "styleOverrides": {},
+      "tierId": null
     }
   ],
   "edges": [
@@ -140,6 +145,11 @@
       "targetHandle": null
     }
   ],
+  "layout": {
+    "direction": "down",
+    "spacing": 250,
+    "tiers": []
+  },
   "view": {
     "viewport": {
       "x": 400,

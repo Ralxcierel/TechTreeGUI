@@ -29,7 +29,9 @@ function setup(data: Record<string, unknown> = { title: 'Fire' }, styleOverrides
   const next: GraphDocument = {
     ...doc,
     nodeTypes: [{ ...tech, fields: FIELDS }, ...doc.nodeTypes.slice(1)],
-    nodes: [{ id: 'n1', typeId: tech.id, position: { x: 0, y: 0 }, data, styleOverrides }],
+    nodes: [
+      { id: 'n1', typeId: tech.id, position: { x: 0, y: 0 }, data, styleOverrides, tierId: null },
+    ],
   }
   s().loadDocument(next)
   render(<NodeInspector nodeId="n1" />)

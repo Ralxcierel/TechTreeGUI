@@ -128,9 +128,49 @@ describe('validateDocument', () => {
       'view.viewport.zoom must be positive.',
     ],
     [
+      'layout direction',
+      (d: ReturnType<typeof fixture>) => (d.layout.direction = 'sideways'),
+      'layout.direction must be one of "down", "up", "left", "right", "radial".',
+    ],
+    [
+      'layout spacing',
+      (d: ReturnType<typeof fixture>) => (d.layout.spacing = 0),
+      'layout.spacing must be positive.',
+    ],
+    ['missing layout', (d: ReturnType<typeof fixture>) => delete d.layout, 'layout is missing.'],
+    [
+      'tier list',
+      (d: ReturnType<typeof fixture>) => (d.layout.tiers = 'Ancient'),
+      'layout.tiers must be an array.',
+    ],
+    [
+      'tier id',
+      (d: ReturnType<typeof fixture>) => (d.layout.tiers = [{ id: ' ', name: 'Ancient' }]),
+      'layout.tiers[0].id must not be empty or blank.',
+    ],
+    [
+      'tier name',
+      (d: ReturnType<typeof fixture>) => (d.layout.tiers = [{ id: 'ancient' }]),
+      'layout.tiers[0].name is missing.',
+    ],
+    [
+      'duplicate tier id',
+      (d: ReturnType<typeof fixture>) =>
+        (d.layout.tiers = [
+          { id: 'a', name: 'A' },
+          { id: 'a', name: 'B' },
+        ]),
+      'layout.tiers[1].id duplicates layout.tiers[0].id ("a").',
+    ],
+    [
+      'node tier',
+      (d: ReturnType<typeof fixture>) => (d.nodes[0].tierId = 3),
+      'nodes[0].tierId must be a string or null.',
+    ],
+    [
       'schemaVersion',
       (d: ReturnType<typeof fixture>) => (d.schemaVersion = 1),
-      'schemaVersion must be 3.',
+      'schemaVersion must be 4.',
     ],
   ])('reports a bad %s', (_name, breakIt, message) => {
     const raw = fixture()
@@ -305,5 +345,15 @@ describe('integrity (S6, S7)', () => {
     const raw = fixture()
     raw.edges.push({ ...raw.edges[0], id: 'e_back', source: 'n_pottery', target: 'n_fire' })
     expect(errorsOf(raw)).toEqual([])
+  })
+})
+
+describe('validateDocument: tiers', () => {
+  it('fills a missing node tierId with null and keeps an id that names no tier', () => {
+    const raw = fixture()
+    delete raw.nodes[0].tierId
+    raw.nodes[1].tierId = 'lost'
+    const result = validateDocument(raw)
+    expect(result.ok && result.doc.nodes.slice(0, 2).map((n) => n.tierId)).toEqual([null, 'lost'])
   })
 })

@@ -929,3 +929,57 @@ body,
   top: calc(14.6% - 11px);
   right: calc(14.6% - 11px);
 }
+
+/* Layout settings in the Document inspector (Phase 4): the tier list. */
+.inspector__minor-heading {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tier-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.tier-list__number {
+  min-width: 1.5em;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tier-list__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tier-list__name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.tier-list__name:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.tier-list__count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tier-list .inspector__link:disabled {
+  color: var(--text-muted);
+  opacity: 0.4;
+  cursor: default;
+}

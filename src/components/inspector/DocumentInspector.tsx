@@ -1,6 +1,7 @@
 // Shown when nothing is selected: properties of the whole document.
 import { useEditorStore } from '../../editor/store'
 import { LabeledInput } from './LabeledInput'
+import { LayoutSettingsEditor } from './LayoutSettingsEditor'
 
 export function DocumentInspector() {
   const name = useEditorStore((s) => s.doc.meta.name)
@@ -17,6 +18,7 @@ export function DocumentInspector() {
         {nodeCount} {nodeCount === 1 ? 'node' : 'nodes'}, {edgeCount}{' '}
         {edgeCount === 1 ? 'edge' : 'edges'}
       </p>
+      <LayoutSettingsEditor />
     </>
   )
 }

@@ -104,6 +104,7 @@ describe('GraphNode', () => {
             position: { x: 0, y: 0 },
             data: { title: 'Fire', era: 'Ancient', cost: 5, notes: 'a\nb' },
             styleOverrides: {},
+            tierId: null,
           },
         ],
       },
