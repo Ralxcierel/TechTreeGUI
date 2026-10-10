@@ -2,18 +2,42 @@
 // Pure, so it can be tested without rendering React Flow.
 import { getBezierPath, getSmoothStepPath, getStraightPath } from '@xyflow/react'
 import type { EdgePath } from '../model'
-import type { Anchor } from './floatingEdge'
+import {
+  boundaryAnchor,
+  floatingAnchors,
+  type Anchor,
+  type Box,
+  type Outline,
+} from './floatingEdge'
+
+/** One end of an edge: its node's box and outline, and the fixed handle position if it has one. */
+export interface EdgeEnd {
+  box: Box
+  outline: Outline
+  /** React Flow's position of the handle this end is fixed to, or null if it floats. */
+  fixed: Anchor | null
+}
 
 /**
- * Picks each end: React Flow's handle position when that end names a fixed handle, otherwise the
- * floating anchor on the side facing the other node.
+ * Picks each end: the fixed handle position when that end names a handle, otherwise a floating
+ * anchor on the side facing the other end. A floating end aims at the other end's fixed handle
+ * when it has one (so the line points at the handle), otherwise at the other node's centre.
  */
-export function chooseEnds(
-  floating: { source: Anchor; target: Anchor },
-  fixedSource: Anchor | null,
-  fixedTarget: Anchor | null,
-): { source: Anchor; target: Anchor } {
-  return { source: fixedSource ?? floating.source, target: fixedTarget ?? floating.target }
+export function chooseEnds(source: EdgeEnd, target: EdgeEnd): { source: Anchor; target: Anchor } {
+  if (source.fixed && target.fixed) return { source: source.fixed, target: target.fixed }
+  if (source.fixed) {
+    return {
+      source: source.fixed,
+      target: boundaryAnchor(target.box, target.outline, source.fixed),
+    }
+  }
+  if (target.fixed) {
+    return {
+      source: boundaryAnchor(source.box, source.outline, target.fixed),
+      target: target.fixed,
+    }
+  }
+  return floatingAnchors(source.box, source.outline, target.box, target.outline)
 }
 
 /** SVG path for an edge between two anchors, in the given line shape. */

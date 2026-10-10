@@ -1,18 +1,27 @@
 // The one generic node component. Its look and contents come from the node's type (plus the node's
 // own style overrides), not from code.
-import { Handle, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
-import { useId, useState } from 'react'
+import {
+  Handle,
+  NodeToolbar,
+  Position,
+  useStore,
+  useUpdateNodeInternals,
+  type NodeProps,
+} from '@xyflow/react'
+import { useEffect, useId, useState } from 'react'
 import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
 import { useEditorStore } from '../../editor/store'
-import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
+import { sideHandleIds, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle } from '../../model'
 import { cardIcon } from '../../editor/images'
+import { outlineForShape } from '../../editor/floatingEdge'
 import { CardEnumSelect } from './CardEnumSelect'
 import { CardExpanded } from './CardExpanded'
 import { CardIconView } from './CardIconView'
 import { CardImage } from './CardImage'
 import { CardTooltip } from './CardTooltip'
 import { EditableText } from './EditableText'
+import { NamedHandle } from './NamedHandle'
 import { useHoverIntent } from './useHoverIntent'
 
 /** How long the pointer must rest on a node before its tooltip shows (decision D2 of Phase 3). */
@@ -38,6 +47,17 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const connecting = useStore((s) => s.connection.inProgress)
   // True while a text line on the card is being edited.
   const [editing, setEditing] = useState(false)
+  // React Flow measures where a node's handles are only when the node resizes. When the type's
+  // named handles (or the shape, which moves them onto a circle) change, ask it to measure again,
+  // or edges would stay attached to the old positions.
+  const updateNodeInternals = useUpdateNodeInternals()
+  const shapeKey = nodeType
+    ? knownShape(resolveNodeStyle(nodeType.style, data.overrides).shape)
+    : ''
+  const handlesKey = JSON.stringify([nodeType?.handles ?? [], shapeKey])
+  useEffect(() => {
+    updateNodeInternals(id)
+  }, [id, handlesKey, updateNodeInternals])
   // Pressing on the card (to drag, connect, or edit) hides the tooltip until the pointer leaves
   // and rests on the node again.
   // (pointerdown, not mousedown: React Flow's drag handling stops mousedown before React sees it.)
@@ -84,9 +104,16 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
           <CardTooltip id={tooltipId} lines={tips} />
         </NodeToolbar>
       )}
+      {/* The type's named handles: always shown, and edges drawn from them stay on them. They come
+          before the side handles: when a dropped connection is equally near both (a named handle in
+          the middle of a side sits exactly on that side's handle), React Flow picks the first. */}
+      {nodeType.handles.map((h) => (
+        <NamedHandle key={h.id} handle={h} outline={outlineForShape(shape)} />
+      ))}
       {/* Connection points on every side. In the canvas's "loose" mode any of them can start or
           finish a connection; edges then float to whichever side faces the other node. */}
-      {SIDE_HANDLE_IDS.map((side) => (
+      {/* (Not where a named handle sits in the middle of that side: see sideHandleIds.) */}
+      {sideHandleIds(nodeType.handles).map((side) => (
         <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
       ))}
       <div className="graph-node__body">

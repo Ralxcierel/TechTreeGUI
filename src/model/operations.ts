@@ -1,6 +1,14 @@
 // Immutable graph operations: each returns a new document and never mutates its input.
 import { newEdgeId, newNodeId } from './ids'
-import type { GraphDocument, GraphEdge, GraphNode, NodeStyle, Position, Viewport } from './types'
+import type {
+  GraphDocument,
+  GraphEdge,
+  GraphNode,
+  HandleDef,
+  NodeStyle,
+  Position,
+  Viewport,
+} from './types'
 
 /** Adds a node of `typeId`, filling its data from the type's field defaults. */
 export function addNode(
@@ -139,6 +147,35 @@ export interface EdgeEnds {
   targetHandle?: string | null
 }
 
+/**
+ * The named handle `handleId` of the node's type, or undefined if the type has none by that id
+ * (a generic side handle, or an id the type no longer has: that edge end floats).
+ */
+export function namedHandle(
+  doc: GraphDocument,
+  nodeId: string,
+  handleId: string | null | undefined,
+): HandleDef | undefined {
+  if (handleId === null || handleId === undefined) return undefined
+  const node = doc.nodes.find((n) => n.id === nodeId)
+  const type = node && doc.nodeTypes.find((t) => t.id === node.typeId)
+  return type?.handles.find((h) => h.id === handleId)
+}
+
+/** A handle's name for messages: its label, or its id if the label is blank. */
+export function handleName(h: HandleDef): string {
+  return h.label.trim() === '' ? h.id : h.label
+}
+
+/** Why the ends use a named handle against its direction (D5), or null if they don't. */
+function directionError(doc: GraphDocument, ends: EdgeEnds): string | null {
+  const from = namedHandle(doc, ends.source, ends.sourceHandle)
+  if (from?.direction === 'in') return `The handle "${handleName(from)}" only ends edges.`
+  const to = namedHandle(doc, ends.target, ends.targetHandle)
+  if (to?.direction === 'out') return `The handle "${handleName(to)}" only starts edges.`
+  return null
+}
+
 /** Why an edge may not be created, or `null` if it may (schema rule S7). Cycles are allowed. */
 export function connectionError(doc: GraphDocument, ends: EdgeEnds): string | null {
   const { source, target, typeId } = ends
@@ -146,10 +183,39 @@ export function connectionError(doc: GraphDocument, ends: EdgeEnds): string | nu
   if (!doc.nodes.some((n) => n.id === source)) return `Unknown source node: ${source}`
   if (!doc.nodes.some((n) => n.id === target)) return `Unknown target node: ${target}`
   if (!doc.edgeTypes.some((t) => t.id === typeId)) return `Unknown edge type: ${typeId}`
+  const wrongWay = directionError(doc, ends)
+  if (wrongWay) return wrongWay
+  // An exact duplicate has the same ends, type and handles; other handles make it a new edge.
+  const sourceHandle = ends.sourceHandle ?? null
+  const targetHandle = ends.targetHandle ?? null
   const duplicate = doc.edges.some(
-    (e) => e.source === source && e.target === target && e.typeId === typeId,
+    (e) =>
+      e.source === source &&
+      e.target === target &&
+      e.typeId === typeId &&
+      e.sourceHandle === sourceHandle &&
+      e.targetHandle === targetHandle,
   )
-  return duplicate ? 'These nodes are already connected by this edge type.' : null
+  return duplicate
+    ? 'These nodes are already connected this way (same edge type and handles).'
+    : null
+}
+
+/**
+ * The ends of a connection drawn "the wrong way", e.g. dragged from an "in" handle to an "out"
+ * handle, flipped so the edge still runs out → in. Returns `ends` itself when it already fits, or
+ * when flipping wouldn't fit either.
+ */
+export function orientEnds(doc: GraphDocument, ends: EdgeEnds): EdgeEnds {
+  if (directionError(doc, ends) === null) return ends
+  const flipped: EdgeEnds = {
+    ...ends,
+    source: ends.target,
+    target: ends.source,
+    sourceHandle: ends.targetHandle ?? null,
+    targetHandle: ends.sourceHandle ?? null,
+  }
+  return directionError(doc, flipped) === null ? flipped : ends
 }
 
 export type ConnectResult =

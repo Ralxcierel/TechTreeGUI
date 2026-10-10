@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FIVE_NODES } from './__fixtures__'
+import { FIVE_NODES, FIVE_NODES_V2 } from './__fixtures__'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
 import {
   addNode,
@@ -24,6 +24,13 @@ describe('serialize / parseDocument round trip', () => {
     const doc = parseOk(FIVE_NODES)
     expect(doc.nodes).toHaveLength(5)
     expect(doc.edges).toHaveLength(4)
+    expect(serialize(doc)).toBe(FIVE_NODES)
+  })
+
+  it('loads the schema v2 file and saves it as the same graph in v3 (handles: [])', () => {
+    const doc = parseOk(FIVE_NODES_V2)
+    expect(doc.schemaVersion).toBe(3)
+    expect(doc.nodeTypes.every((t) => t.handles.length === 0)).toBe(true)
     expect(serialize(doc)).toBe(FIVE_NODES)
   })
 

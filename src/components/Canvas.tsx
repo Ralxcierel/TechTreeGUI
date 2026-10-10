@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
 import { useEditorStore } from '../editor/store'
-import { toFlowEdges, type FlowNode } from '../editor/flowAdapter'
+import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
@@ -32,9 +32,18 @@ export function Canvas() {
   // The live viewport is copied back into the document only on Save (see Toolbar).
   const [initialViewport] = useState(() => useEditorStore.getState().doc.view.viewport)
 
+  // Which handles each node has. Rebuilt only when nodes are added, removed or retyped, or a
+  // type's handles change, not on every drag (the key ignores positions).
+  const docNodes = useEditorStore((s) => s.doc.nodes)
+  const nodeTypesKey = JSON.stringify(docNodes.map((n) => [n.id, n.typeId]))
+  const named = useMemo(
+    () => handleIdsByNode(docNodes, nodeTypeList),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeTypesKey covers what is read
+    [nodeTypesKey, nodeTypeList],
+  )
   const edges = useMemo(
-    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds),
-    [docEdges, edgeTypeList, selectedEdgeIds],
+    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds, named),
+    [docEdges, edgeTypeList, selectedEdgeIds, named],
   )
   const miniMapColor = useCallback(
     (node: FlowNode) => {

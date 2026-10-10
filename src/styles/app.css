@@ -197,6 +197,26 @@ body,
   opacity: 1;
 }
 
+/* A type's named handles are always shown: they are part of the card's design. Filled = edges
+   start here ("out"), hollow = edges end here ("in"), half filled = both. */
+.react-flow__node .react-flow__handle.graph-node__handle {
+  opacity: 1;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  background: var(--accent);
+  /* Above a side handle in the same spot, so pointing at the dot finds the named handle. */
+  z-index: 1;
+}
+
+.react-flow__node .react-flow__handle.graph-node__handle--in {
+  background: var(--bg);
+}
+
+.react-flow__node .react-flow__handle.graph-node__handle--both {
+  background: linear-gradient(90deg, var(--accent) 50%, var(--bg) 50%);
+}
+
 /* Selected nodes get an accent outline, so it is clear what the inspector is showing. */
 .react-flow__node.selected .graph-node {
   box-shadow: 0 0 0 2px var(--accent);

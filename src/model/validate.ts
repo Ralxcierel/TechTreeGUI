@@ -8,6 +8,8 @@ import { fieldValueProblem } from './fieldValues'
 import { connectionError } from './operations'
 import {
   CURRENT_SCHEMA_VERSION,
+  HANDLE_DIRECTIONS,
+  HANDLE_SIDES,
   type DocumentMeta,
   type EdgePath,
   type EdgeStyle,
@@ -18,6 +20,7 @@ import {
   type GraphDocument,
   type GraphEdge,
   type GraphNode,
+  type HandleDef,
   type NodeStyle,
   type NodeType,
   type Viewport,
@@ -251,6 +254,33 @@ function readStyleOverrides(r: Reader, o: Obj, path: string): Partial<NodeStyle>
   return r.errors.length === before ? { ...o } : undefined
 }
 
+/** A named handle (schema v3). `offset` is optional and defaults to the middle of the side. */
+function readHandle(r: Reader, value: unknown, path: string): HandleDef | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  let id = r.id(o, 'id', path)
+  if (id !== undefined && (HANDLE_SIDES as readonly string[]).includes(id)) {
+    id = r.fail(`${path}.id`, `must not be ${list(HANDLE_SIDES)} (those are the side handles).`)
+  }
+  const label = r.string(o, 'label', path)
+  const side = r.oneOf(o, 'side', path, HANDLE_SIDES)
+  let offset = o.offset === undefined ? 0.5 : r.number(o, 'offset', path)
+  if (offset !== undefined && (offset < 0 || offset > 1)) {
+    offset = r.fail(`${path}.offset`, 'must be between 0 and 1.')
+  }
+  const direction = r.oneOf(o, 'direction', path, HANDLE_DIRECTIONS)
+  if (
+    id === undefined ||
+    label === undefined ||
+    side === undefined ||
+    offset === undefined ||
+    direction === undefined
+  ) {
+    return undefined
+  }
+  return { ...o, id, label, side, offset, direction }
+}
+
 function readNodeType(r: Reader, value: unknown, path: string): NodeType | undefined {
   const o = r.object(value, path)
   if (!o) return undefined
@@ -264,8 +294,15 @@ function readNodeType(r: Reader, value: unknown, path: string): NodeType | undef
       `${path}.fields`,
       'key',
     )
-  if (id === undefined || name === undefined || !style || !fields) return undefined
-  return { ...o, id, name, style, fields }
+  const handles = r.items(o.handles, `${path}.handles`, (h, p) => readHandle(r, h, p))
+  if (handles)
+    r.unique(
+      handles.map((h) => h.id),
+      `${path}.handles`,
+      'id',
+    )
+  if (id === undefined || name === undefined || !style || !fields || !handles) return undefined
+  return { ...o, id, name, style, fields, handles }
 }
 
 function readEdgeStyle(r: Reader, value: unknown, path: string): EdgeStyle | undefined {
@@ -389,7 +426,8 @@ function checkIntegrity(r: Reader, doc: GraphDocument): void {
   })
 
   // Re-add edges one by one with the same rule the editor uses, so a file can't hold an edge the
-  // editor would refuse (self-loop, duplicate, dangling end, unknown type).
+  // editor would refuse (self-loop, duplicate, dangling end, unknown type, a named handle used
+  // against its direction). A handle id the node's type doesn't have is allowed: that end floats.
   const accepted: GraphEdge[] = []
   const built: GraphDocument = { ...doc, edges: accepted }
   doc.edges.forEach((e, i) => {

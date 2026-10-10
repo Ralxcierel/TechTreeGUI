@@ -21,10 +21,11 @@ const DOCUMENT: Shape = {
     meta: { keys: ['name', 'created', 'modified'] },
     nodeTypes: [
       {
-        keys: ['id', 'name', 'style', 'fields'],
+        keys: ['id', 'name', 'style', 'fields', 'handles'],
         children: {
           style: { keys: nodeStyleKeys },
           fields: [{ keys: ['key', 'label', 'kind', 'default', 'options', 'show'] }],
+          handles: [{ keys: ['id', 'label', 'side', 'offset', 'direction'] }],
         },
       },
     ],

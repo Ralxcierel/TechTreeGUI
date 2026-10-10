@@ -16,6 +16,8 @@ import {
   SELECTED_EDGE_COLOR,
   SIDE_HANDLE_IDS,
   toFlowEdges,
+  handleIdsByNode,
+  sideHandleIds,
   toFlowNodes,
   uiForLoadedDocument,
 } from './flowAdapter'
@@ -202,6 +204,36 @@ describe('uiForLoadedDocument', () => {
 
 describe('toFlowEdges', () => {
   const edges = twoNodes().edges
+
+  it('passes on side handle ids and the named handle ids of each end node, nothing else', () => {
+    const doc = twoNodes()
+    const handle = { label: 'X', side: 'left', offset: 0.5, direction: 'both' } as const
+    const nodeTypes = doc.nodeTypes.map((t) =>
+      t.id === doc.nodes[0]!.typeId ? { ...t, handles: [{ ...handle, id: 'x' }] } : t,
+    )
+    // Only node a has the type with handle "x" when b is retyped.
+    const nodes = doc.nodes.map((n) => (n.id === 'b' ? { ...n, typeId: 'other' } : n))
+    const named = handleIdsByNode(nodes, nodeTypes)
+    expect([...named.keys()]).toEqual(['a'])
+    expect([...named.get('a')!]).toEqual(['x', 'top', 'right', 'bottom'])
+    const base = doc.edges[0]!
+    const flow = (sourceHandle: string | null, targetHandle: string | null) => {
+      const [edge] = toFlowEdges([{ ...base, sourceHandle, targetHandle }], [], new Set(), named)
+      return [edge?.sourceHandle, edge?.targetHandle]
+    }
+    expect(flow('x', 'x')).toEqual(['x', null]) // b has no handle "x"
+    expect(flow('top', 'gone')).toEqual(['top', null])
+    expect(flow(null, 'left')).toEqual([null, 'left'])
+    // a's "left" side handle isn't drawn (handle "x" sits on its spot), so that end floats.
+    expect(flow('left', null)).toEqual([null, null])
+  })
+
+  it('leaves out the side handles that a named handle in the middle of the side covers', () => {
+    const h = (side: 'left' | 'top', offset: number) =>
+      ({ id: side, label: '', side, offset, direction: 'both' }) as const
+    expect(sideHandleIds([])).toEqual(['top', 'right', 'bottom', 'left'])
+    expect(sideHandleIds([h('left', 0.5), h('top', 0.25)])).toEqual(['top', 'right', 'bottom'])
+  })
 
   it('styles edges from their type and marks selection', () => {
     const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set(['ab']))

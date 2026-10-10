@@ -3,14 +3,15 @@
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
 ## Resume here (session ended 2026-10-09, at a clean increment boundary)
-1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (426 tests at hand-off).
-2. Waiting on the developer: review and approve **P3-3 (pictures and icons)** at the gate.
-3. After approval, start **P3-4 (named handles, schema v3)** from `docs/PLAN-phase3.md`: restate it, flag new decisions (D5 and D8 cover the schema and the delete rule), build model → migration v2→v3 + round-trip test → type editor handle list → card handles → connecting and fixed anchoring (and the floating end aiming at a fixed handle), test, review loop, stop at the gate, push. Then **P3-5, the Phase 3 gate**.
+1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (479 tests at hand-off).
+2. Waiting on the developer: review and approve **P3-4 (named handles, schema v3)** at the gate.
+3. After approval, start **P3-5, the Phase 3 gate** from `docs/PLAN-phase3.md`: an automated "done when" test at store level (like `src/editor/phase2.acceptance.test.ts`) covering the tooltip, the on-card dropdown, the expanded section, the icon, In/Out handles with an Out → In edge that stays attached while a floating edge attaches to the facing side, and save → reload → load giving an identical graph; then a hand check in the browser with a screenshot; then PROGRESS.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
-5. Shell gotcha seen this session: in Bash heredocs on this machine, `\n` inside Python string literals turned into real newlines, which broke edits and once silently dropped a test assertion. Prefer the Edit tool for lines that contain `\n` or regex escapes, and re-read the result.
+5. Shell gotcha (hit again on 2026-10-09): in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script. Prefer the Edit/Write tools for lines that contain escapes, and re-read the result.
+6. Browser pane gotcha: after `resize_window` to e.g. 1100×750 the page lays out at that size, but screenshots come out shrunk into a corner. Pointer input still works: screenshot-frame coordinates × (page width / 800) = page coordinates. Read positions with JavaScript (`getBoundingClientRect`) and click by `ref` where you can. At the pane's own size (about 400px wide) the canvas has no room.
 
 ## Where we are
-- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 (tooltips), P3-1 (on-card dropdowns) and P3-2 (expandable sections) are approved. **P3-3 (pictures and icons) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.** Still to do: P3-4 (named handles) and P3-5 (gate).
+- **DESIGN Phase 3** (plan `docs/PLAN-phase3.md`, approved 2026-10-08 with D1–D8; Q1–Q3 answered "not now"). P3-0 to P3-3 are approved (P3-3 on 2026-10-09). **P3-4 (named handles) is built, reviewed, committed and pushed on `phase2`, waiting at the gate.** Still to do: P3-5 (gate).
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
@@ -46,7 +47,56 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - 426 tests. In the browser with real input: a ⚙ text icon on the card's title row; the title editor beside the icon; a `data:` SVG picture on the card (the card grew); a broken `data:` address showed the fallback.
   - Independent review, 2 rounds. Round 1 (no bugs): the override Icon box snapped back to the type's icon while typing; a broken icon picture's note covered the title; the floated icon could hang outside the card; plus nits (title editor dropping below the icon, long text icons cropped in the middle, no retry for a failed address, blank icons stored, huge fallback hover text, missing tests). All fixed. Round 2: clean.
   - Known and accepted: picture addresses are saved on every keystroke, so typing a URL requests partial addresses and the card flickers; on circles the icon takes room from the fixed-height content; pills and circles crop or round pictures awkwardly; an explicit "no icon" override for one node can't be set from the UI; a picture line reads "Art: Art, image" to screen readers; opening a file loads its remote picture addresses (no referrer is sent).
-
+- **P3-4 named handles (schema v3):**
+  - Developer's choices before building (2026-10-09, "recommended for all"):
+    - a connection dragged the wrong way is flipped so it runs out → in
+    - the duplicate rule includes handle ids
+    - renaming a handle id moves the edges that use it
+    - a direction change that edges would break is blocked
+    - named handles are always-visible dots, with the label as hover text
+    - new handles get an id from the label, offset 0.5 and direction "both"
+    - on circles, handles sit on the outline
+  - **Model:**
+    - `HandleDef` (`id, label, side, offset, direction`) on `nodeTypes[].handles`, and `CURRENT_SCHEMA_VERSION = 3`.
+    - Migration v2 → v3 adds `handles: []`.
+    - Validation: ids non-blank, unique per type and never a side id; offset 0–1, default 0.5. Canonical key order updated.
+    - `src/model/handles.ts`: `addHandle`, `updateHandle`, `renameHandleId` (moves edges; refuses ids that edges still store), `removeHandle` (blocked while used, D8), `moveHandle`, `handleUsage`.
+    - `operations.ts`: `namedHandle`, `handleName`, the direction rules in `connectionError` (also applied on load), the duplicate rule with handle ids, and `orientEnds` (the flip).
+  - **Fixtures:** `five-nodes.json` is now v3, and `five-nodes-v2.json` is the old file. A test checks that the v2 file loads and saves byte for byte as the v3 fixture. A round-trip test covers handles and handle-attached edges.
+  - **Editor:**
+    - The store flips connections (`orientEnds`) and has the handle actions.
+    - `chooseEnds` (edgePath) aims a floating end at the other end's fixed handle.
+    - `flowAdapter`: `handleIdsByNode` and `sideHandleIds`, so React Flow only gets handle ids the node really has; any other id floats.
+  - **Cards:**
+    - `NamedHandle.tsx` draws each handle (filled = out, hollow = in, half filled = both), placed by `src/editor/handlePlacement.ts` (on the outline for circles).
+    - Named handles render before the side handles. **No generic side handle is drawn where a named handle sits in the middle of that side**, because React Flow's snapping could pick the generic one and the edge would float.
+    - `useUpdateNodeInternals` re-measures handles when the type's handles or the shape change.
+  - **Type editor:**
+    - A Handles section of `HandleDefEditor.tsx` rows: label, id (saved on Enter or leaving the box), side, a position slider, direction (with a refusal message), ↑/↓, and Remove (disabled while used).
+    - The stable React key logic moved to `useStableKeys.ts` and is shared with the field list.
+  - **Docs:** `docs/PLAN.md` §1 now describes schema v3 (S7 wording, a new S12, and the `offset` load rule).
+  - **Tests:** 479.
+  - **In the browser, with real mouse input:**
+    - Made In (left, in) and Out (right, out) on Technology, and added 3 nodes.
+    - A.Out → B.In was stored on both handles. C.In → A.Out was stored flipped, as A.Out → C.In. An edge between plain side dots floats.
+    - For B.Out → C's bottom dot, C's end aims at B.Out.
+    - Moving B: both handle-attached ends followed it.
+    - Moving In to the top side: the attached ends moved with it.
+    - Changing In's direction was refused with "2 edges end at it…", and Remove was disabled.
+    - After the round-3 fix, a drop 13px beside the In dot at zoom 1.2 attached to In.
+    - No console errors.
+  - **Independent review, 3 rounds:**
+    - Round 1 (no bugs): `docs/PLAN.md` §1 still described v2; two "same document" tests couldn't fail; one assertion repeated another.
+    - Round 2 found **a real interaction bug**: a drop near a centred named handle snapped to the generic side handle in the same spot, so the edge floated. First fix: render named handles first.
+    - Round 3: that fix only worked at some zoom levels (rounding), so the covered side handle is now left out. Also fixed: S12 said stored side ids float (they don't); `updateHandle` didn't check `direction`; "both" dots looked like "out".
+    - **Round 3's fixes were tested (unit tests and browser) but not re-reviewed (3-round cap).**
+  - **Known and accepted:**
+    - For one frame after renaming a handle id, the edge isn't drawn (React Flow dev warning 008).
+    - A direction error stays on screen until the direction changes again.
+    - Pills use the rectangle outline for handle placement.
+    - A stored unknown id and null both float, but count as different edges for the duplicate rule.
+    - Fixed edge ends attach at the handle's outer edge (React Flow's normal behaviour), about 5px outside the card.
+    - Where a named handle covers the middle of a side, that side has no generic dot; floating edges can use the other sides.
 
 ## Done (DESIGN Phase 2 so far)
 - **Starter types (developer request):** `src/model/starters.ts` holds the starter node types Technology, Era (circle) and Note, and the edge type Prerequisite. New documents get every starter marked `inNewDocuments`, and `addStarterNodeType`/`addStarterEdgeType` add a starter to an existing document (for the Library panel later). To add a starter, append an entry; a unit test checks that each one is valid. Era and Note **can't be placed yet**: Add node uses Technology until P2-5. The Era circle shape renders in P2-2.
@@ -183,6 +233,5 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 ## Known rough edges (for later phases)
 - Values that don't fit their field only get a warning badge in the inspector (D7); the card shows them as JSON.
 - "Add node" stacks new nodes diagonally near the center, so they overlap until dragged apart.
-- Field placements "tooltip" and "expanded" can be set but have no effect until DESIGN Phase 3.
 - Without undo, a deleted type, field or choice list can't be brought back (deletes ask first, D12).
 - No undo/redo yet (DESIGN Phase 5).

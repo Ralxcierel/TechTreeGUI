@@ -130,7 +130,7 @@ describe('validateDocument', () => {
     [
       'schemaVersion',
       (d: ReturnType<typeof fixture>) => (d.schemaVersion = 1),
-      'schemaVersion must be 2.',
+      'schemaVersion must be 3.',
     ],
   ])('reports a bad %s', (_name, breakIt, message) => {
     const raw = fixture()
@@ -246,8 +246,59 @@ describe('integrity (S6, S7)', () => {
       'edges[0] is invalid: Unknown target node: n_missing',
       'edges[1] is invalid: Unknown edge type: unlocks',
       'edges[2] is invalid: A node cannot connect to itself.',
-      'edges[4] is invalid: These nodes are already connected by this edge type.',
+      'edges[4] is invalid: These nodes are already connected this way (same edge type and handles).',
     ])
+  })
+
+  it('reads named handles, defaulting a missing offset to the middle', () => {
+    const raw = fixture()
+    raw.nodeTypes[0].handles = [
+      { id: 'in', label: 'In', side: 'left', direction: 'in', extra: 1 },
+      { id: 'out', label: 'Out', side: 'right', offset: 0, direction: 'out' },
+    ]
+    const result = validateDocument(raw)
+    expect(result.ok && result.doc.nodeTypes[0]!.handles).toEqual([
+      { id: 'in', label: 'In', side: 'left', offset: 0.5, direction: 'in', extra: 1 },
+      { id: 'out', label: 'Out', side: 'right', offset: 0, direction: 'out' },
+    ])
+  })
+
+  it('rejects bad handles: missing list, side ids, repeats, offsets, sides, directions', () => {
+    const raw = fixture()
+    delete raw.nodeTypes[0].handles
+    expect(errorsOf(raw)).toEqual(['nodeTypes[0].handles is missing.'])
+    raw.nodeTypes[0].handles = [
+      { id: 'left', label: 'L', side: 'left', direction: 'in' },
+      { id: 'a', label: 'A', side: 'middle', offset: 2, direction: 'sideways' },
+    ]
+    expect(errorsOf(raw)).toEqual([
+      'nodeTypes[0].handles[0].id must not be one of "top", "right", "bottom", "left" (those are the side handles).',
+      'nodeTypes[0].handles[1].side must be one of "top", "right", "bottom", "left".',
+      'nodeTypes[0].handles[1].offset must be between 0 and 1.',
+      'nodeTypes[0].handles[1].direction must be one of "in", "out", "both".',
+    ])
+    raw.nodeTypes[0].handles = [
+      { id: 'b', label: 'B', side: 'top', direction: 'both' },
+      { id: 'b', label: 'B2', side: 'top', direction: 'both' },
+    ]
+    expect(errorsOf(raw)).toEqual([
+      'nodeTypes[0].handles[1].id duplicates nodeTypes[0].handles[0].id ("b").',
+    ])
+  })
+
+  it('rejects edges that use a named handle against its direction, but not unknown ids', () => {
+    const raw = fixture()
+    raw.nodeTypes[0].handles = [{ id: 'in', label: 'In', side: 'left', direction: 'in' }]
+    raw.edges[0].sourceHandle = 'in'
+    raw.edges[1].sourceHandle = 'gone'
+    expect(errorsOf(raw)).toEqual(['edges[0] is invalid: The handle "In" only ends edges.'])
+  })
+
+  it('allows the same two nodes twice with the same type through other handles', () => {
+    const raw = fixture()
+    raw.nodeTypes[0].handles = [{ id: 'x', label: 'X', side: 'left', direction: 'both' }]
+    raw.edges.push({ ...raw.edges[3], id: 'e_copy', targetHandle: 'x' })
+    expect(errorsOf(raw)).toEqual([])
   })
 
   it('allows cycles', () => {

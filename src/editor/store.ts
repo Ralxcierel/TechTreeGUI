@@ -4,6 +4,7 @@ import type { Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react'
 import { create } from 'zustand'
 import {
   addField,
+  addHandle,
   addNode,
   addStarterEdgeType,
   addStarterNodeType,
@@ -15,22 +16,28 @@ import {
   deleteEdgeType,
   deleteNodeType,
   moveField,
+  moveHandle,
+  orientEnds,
   removeField,
+  removeHandle,
   removeNodeData,
   renameDocument,
   renameFieldKey,
+  renameHandleId,
   setFieldDefault,
   setEdgeType,
   setStyleOverride,
   setViewport,
   updateEdgeType,
   updateField,
+  updateHandle,
   updateNodeData,
   updateNodeType,
   withModified,
   type EdgeEnds,
   type EdgeTypePatch,
   type FieldPatch,
+  type HandlePatch,
   type NodeTypePatch,
   type TypeOpResult,
   type GraphDocument,
@@ -110,6 +117,15 @@ interface EditorState {
   renameFieldKey: (typeId: string, oldKey: string, newKey: string) => string | null
   removeField: (typeId: string, key: string) => void
   moveField: (typeId: string, key: string, by: -1 | 1) => void
+  /** Adds a named handle to a node type. Returns its id. */
+  addHandle: (typeId: string) => string
+  /** The handle actions below return why a change was refused, or null when it worked. */
+  updateHandle: (typeId: string, handleId: string, patch: HandlePatch) => string | null
+  /** Renames a handle id, moving the edges that use it (they stay attached). */
+  renameHandleId: (typeId: string, oldId: string, newId: string) => string | null
+  /** Removes a handle, unless edges use it (D8). */
+  removeHandle: (typeId: string, handleId: string) => string | null
+  moveHandle: (typeId: string, handleId: string, by: -1 | 1) => void
   /** Adds a built-in starter type the document doesn't have. Returns why not, or null. */
   addStarterType: (kind: 'node' | 'edge', starterId: string) => string | null
   /** Sets one value in a node's data, e.g. its title. */
@@ -189,18 +205,20 @@ function closeEditingOnSelect(
 
 /**
  * Model ends for a connection drawn on the canvas. The generic side handles only start a drag, so
- * their ids are dropped and the new edge floats (attaches to the side facing the other node).
+ * their ids are dropped and that end floats (attaches to the side facing the other node); named
+ * handle ids are kept, so the edge stays on them. A connection drawn the wrong way (from an "in"
+ * handle, or onto an "out" handle) is flipped so it runs out → in.
  */
-function toEnds(c: Connection | Edge, typeId: string): EdgeEnds {
+function toEnds(doc: GraphDocument, c: Connection | Edge, typeId: string): EdgeEnds {
   const { source, target } = c
   const keep = (id: string | null | undefined) => (id && !SIDE_HANDLE_IDS.includes(id) ? id : null)
-  return {
+  return orientEnds(doc, {
     source,
     target,
     sourceHandle: keep(c.sourceHandle),
     targetHandle: keep(c.targetHandle),
     typeId,
-  }
+  })
 }
 
 /** Opens a type in the inspector and clears the canvas selection, or closes it with null. */
@@ -245,13 +263,14 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       }),
     isValidConnection: (connection) => {
       const typeId = activeEdgeTypeId(get())
-      return typeId !== null && connectionError(get().doc, toEnds(connection, typeId)) === null
+      const { doc } = get()
+      return typeId !== null && connectionError(doc, toEnds(doc, connection, typeId)) === null
     },
     connect: (connection) =>
       set((s) => {
         const typeId = activeEdgeTypeId(s)
         if (typeId === null) return s
-        const result = connect(s.doc, toEnds(connection, typeId))
+        const result = connect(s.doc, toEnds(s.doc, connection, typeId))
         return result.ok ? derive(s, result.doc, s.ui) : s
       }),
     setActiveEdgeType: (typeId) => set({ activeEdgeTypeId: typeId }),
@@ -315,6 +334,18 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       apply(renameFieldKey(get().doc, typeId, oldKey, newKey)),
     removeField: (typeId, key) => set((s) => derive(s, removeField(s.doc, typeId, key), s.ui)),
     moveField: (typeId, key, by) => set((s) => derive(s, moveField(s.doc, typeId, key, by), s.ui)),
+    addHandle: (typeId) => {
+      const { doc, id } = addHandle(get().doc, typeId)
+      set((s) => derive(s, doc, s.ui))
+      return id
+    },
+    updateHandle: (typeId, handleId, patch) =>
+      apply(updateHandle(get().doc, typeId, handleId, patch)),
+    renameHandleId: (typeId, oldId, newId) =>
+      apply(renameHandleId(get().doc, typeId, oldId, newId)),
+    removeHandle: (typeId, handleId) => apply(removeHandle(get().doc, typeId, handleId)),
+    moveHandle: (typeId, handleId, by) =>
+      set((s) => derive(s, moveHandle(s.doc, typeId, handleId, by), s.ui)),
     addStarterType: (kind, starterId) =>
       apply(
         kind === 'node'

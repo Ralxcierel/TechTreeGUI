@@ -26,6 +26,7 @@ export const STARTER_NODE_TYPES: readonly Starter<NodeType>[] = [
       fields: [
         { key: 'title', label: 'Name', kind: 'text', default: 'New Technology', show: ['card'] },
       ],
+      handles: [],
     }),
   },
   {
@@ -37,6 +38,7 @@ export const STARTER_NODE_TYPES: readonly Starter<NodeType>[] = [
       name: 'Era',
       style: { shape: 'circle', width: 160, fill: '#3b2a0c', border: '#f59e0b', icon: null },
       fields: [{ key: 'title', label: 'Name', kind: 'text', default: 'New Era', show: ['card'] }],
+      handles: [],
     }),
   },
   {
@@ -48,6 +50,7 @@ export const STARTER_NODE_TYPES: readonly Starter<NodeType>[] = [
       name: 'Note',
       style: { shape: 'rect', width: 200, fill: '#33301a', border: '#a3953a', icon: null },
       fields: [{ key: 'text', label: 'Note', kind: 'text', default: 'Note', show: ['card'] }],
+      handles: [],
     }),
   },
 ]

@@ -16,9 +16,19 @@ function v1ToV2(doc: RawDocument): RawDocument {
   return { ...doc, edgeTypes, schemaVersion: 2 }
 }
 
+/** v2 → v3: node types gain `handles` (named connection points); existing types have none. */
+function v2ToV3(doc: RawDocument): RawDocument {
+  if (!Array.isArray(doc.nodeTypes)) return { ...doc, schemaVersion: 3 }
+  const nodeTypes = doc.nodeTypes.map((t: unknown) =>
+    !isPlainObject(t) || 'handles' in t ? t : { ...t, handles: [] },
+  )
+  return { ...doc, nodeTypes, schemaVersion: 3 }
+}
+
 /** Keyed by the version a migration upgrades *from*. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: v1ToV2,
+  2: v2ToV3,
 }
 
 export type MigrateResult = { ok: true; doc: RawDocument } | { ok: false; error: string }

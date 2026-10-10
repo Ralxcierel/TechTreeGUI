@@ -1,13 +1,15 @@
-// Edits a node type opened from the Library: its name, its look, and its list of fields. Changes
+// Edits a node type opened from the Library: its name, its look, its fields and its handles. Changes
 // apply to every node of the type at once. Deleting is blocked while nodes use it (D8) and asks
 // first (D12).
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { useEditorStore } from '../../editor/store'
 import { NODE_SHAPES, nodeTypeUsage, typeInUseMessage } from '../../model'
 import { ColorInput } from './ColorInput'
 import { FieldDefEditor } from './FieldDefEditor'
+import { HandleDefEditor } from './HandleDefEditor'
 import { NumberInput } from './fields/NumberInput'
 import { LabeledInput } from './LabeledInput'
+import { useStableKeys } from './useStableKeys'
 
 interface NodeTypeInspectorProps {
   typeId: string
@@ -19,6 +21,7 @@ export function NodeTypeInspector({ typeId }: NodeTypeInspectorProps) {
   const update = useEditorStore((s) => s.updateNodeType)
   const remove = useEditorStore((s) => s.deleteNodeType)
   const addField = useEditorStore((s) => s.addField)
+  const addHandle = useEditorStore((s) => s.addHandle)
   const close = useEditorStore((s) => s.editNodeType)
   const ids = {
     shape: useId(),
@@ -28,46 +31,11 @@ export function NodeTypeInspector({ typeId }: NodeTypeInspectorProps) {
     icon: useId(),
     why: useId(),
   }
-  // A stable React key per field. Keying by the field key alone would remount a field's editor
-  // when its key is renamed, losing focus (and swallowing a click on its buttons). So a renamed
-  // field keeps the React key it had: `aliases` maps its new field key to that React key.
-  const [aliases, setAliases] = useState<ReadonlyMap<string, string>>(new Map())
+  // Stable React keys, so renaming a field key or handle id keeps its editor (and focus).
+  const fieldKeys = useStableKeys(type?.fields.map((f) => f.key) ?? [])
+  const handleKeys = useStableKeys(type?.handles.map((h) => h.id) ?? [])
   if (!type) return null
   const { style } = type
-  // Renamed fields first, then the rest by their own key, with "+" added until it is unique.
-  const reactKeys = new Map<string, string>()
-  const used = new Set<string>()
-  for (const f of type.fields) {
-    const alias = aliases.get(f.key)
-    if (alias !== undefined) {
-      reactKeys.set(f.key, alias)
-      used.add(alias)
-    }
-  }
-  for (const f of type.fields) {
-    if (reactKeys.has(f.key)) continue
-    let k = f.key
-    while (used.has(k)) k = `+${k}`
-    reactKeys.set(f.key, k)
-    used.add(k)
-  }
-  const editorKey = (fieldKey: string) => reactKeys.get(fieldKey) ?? fieldKey
-  const onRemoved = (key: string) =>
-    setAliases((m) => {
-      if (!m.has(key)) return m
-      const next = new Map(m)
-      next.delete(key)
-      return next
-    })
-  const onKeyRenamed = (oldKey: string, newKey: string) => {
-    const reactKey = editorKey(oldKey)
-    setAliases((m) => {
-      const next = new Map(m)
-      next.delete(oldKey)
-      next.set(newKey, reactKey)
-      return next
-    })
-  }
 
   const onDelete = () => {
     if (!window.confirm(`Delete the node type "${type.name.trim() || type.id}"?`)) return
@@ -170,18 +138,42 @@ export function NodeTypeInspector({ typeId }: NodeTypeInspectorProps) {
         <p className="inspector__note">The first text field is the card’s title.</p>
         {type.fields.map((field, i) => (
           <FieldDefEditor
-            key={editorKey(field.key)}
+            key={fieldKeys.keyOf(field.key)}
             typeId={typeId}
             field={field}
             isFirst={i === 0}
             isLast={i === type.fields.length - 1}
-            onKeyRenamed={onKeyRenamed}
-            onRemoved={onRemoved}
+            onKeyRenamed={fieldKeys.renamed}
+            onRemoved={fieldKeys.removed}
           />
         ))}
         <div className="inspector__row">
           <button type="button" className="inspector__button" onClick={() => addField(typeId)}>
             Add field
+          </button>
+        </div>
+      </section>
+
+      <section aria-label="Handles">
+        <h3 className="inspector__subheading">Handles</h3>
+        <p className="inspector__note">
+          Named connection points. Edges drawn from them stay attached; edges drawn from the plain
+          side dots float to the side facing the other node.
+        </p>
+        {type.handles.map((handle, i) => (
+          <HandleDefEditor
+            key={handleKeys.keyOf(handle.id)}
+            typeId={typeId}
+            handle={handle}
+            isFirst={i === 0}
+            isLast={i === type.handles.length - 1}
+            onIdRenamed={handleKeys.renamed}
+            onRemoved={handleKeys.removed}
+          />
+        ))}
+        <div className="inspector__row">
+          <button type="button" className="inspector__button" onClick={() => addHandle(typeId)}>
+            Add handle
           </button>
         </div>
       </section>

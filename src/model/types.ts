@@ -1,7 +1,7 @@
-// Graph document schema, version 2. See docs/PLAN.md §1.
+// Graph document schema, version 3. See docs/PLAN.md §1.
 // Pure data types: no React or UI imports anywhere in src/model/.
 
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
 export type FieldKind = 'text' | 'number' | 'enum' | 'boolean' | 'list' | 'richtext' | 'image'
 export type FieldPlacement = 'card' | 'tooltip' | 'expanded'
@@ -23,11 +23,34 @@ export interface NodeStyle {
   icon: string | null
 }
 
+/** A side of a node's box. */
+export type HandleSide = 'top' | 'right' | 'bottom' | 'left'
+
+/** Every side, in this order. Also the ids of the generic side handles, which named handles can't use. */
+export const HANDLE_SIDES: readonly HandleSide[] = ['top', 'right', 'bottom', 'left']
+
+/** Which way edges may use a named handle: "out" starts edges, "in" ends them, "both" does either. */
+export type HandleDirection = 'in' | 'out' | 'both'
+
+export const HANDLE_DIRECTIONS: readonly HandleDirection[] = ['in', 'out', 'both']
+
+/** A named connection point of a node type (added in schema v3, decision D5 of Phase 3). */
+export interface HandleDef {
+  /** Unique within the type, and never one of the generic side ids top/right/bottom/left. */
+  id: string
+  label: string
+  side: HandleSide
+  /** Where along the side, from 0 (top or left end) to 1 (bottom or right end). */
+  offset: number
+  direction: HandleDirection
+}
+
 export interface NodeType {
   id: string
   name: string
   style: NodeStyle
   fields: FieldDef[]
+  handles: HandleDef[]
 }
 
 /** Line shape of an edge (added in schema v2). */

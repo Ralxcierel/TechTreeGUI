@@ -1,5 +1,6 @@
 // The one edge component. It attaches each end to the side of its node that faces the other node
-// ("floating"), unless the edge names a fixed handle, and draws the line shape of its edge type.
+// ("floating"), unless the edge names a fixed handle (a named handle of the node's type), and
+// draws the line shape of its edge type.
 import {
   BaseEdge,
   useInternalNode,
@@ -10,7 +11,7 @@ import {
 import { chooseEnds, edgePath } from '../../editor/edgePath'
 import { useEditorStore } from '../../editor/store'
 import type { FlowEdge, FlowNode } from '../../editor/flowAdapter'
-import { floatingAnchors, outlineForShape, type Box } from '../../editor/floatingEdge'
+import { outlineForShape, type Box } from '../../editor/floatingEdge'
 import { resolveNodeStyle } from '../../model'
 
 function boxOf(node: InternalNode<FlowNode>): Box {
@@ -29,19 +30,19 @@ export function GraphEdge(props: EdgeProps<FlowEdge>) {
     const base = nodeTypes.find((t) => t.id === node.data.typeId)?.style
     return base ? resolveNodeStyle(base, node.data.overrides).shape : undefined
   }
-  const floating = floatingAnchors(
-    boxOf(sourceNode),
-    outlineForShape(shapeOf(sourceNode)),
-    boxOf(targetNode),
-    outlineForShape(shapeOf(targetNode)),
-  )
-
   const fixed = (handleId: string | null | undefined, x: number, y: number, position: Position) =>
     handleId ? { x, y, position } : null
   const ends = chooseEnds(
-    floating,
-    fixed(props.sourceHandleId, props.sourceX, props.sourceY, props.sourcePosition),
-    fixed(props.targetHandleId, props.targetX, props.targetY, props.targetPosition),
+    {
+      box: boxOf(sourceNode),
+      outline: outlineForShape(shapeOf(sourceNode)),
+      fixed: fixed(props.sourceHandleId, props.sourceX, props.sourceY, props.sourcePosition),
+    },
+    {
+      box: boxOf(targetNode),
+      outline: outlineForShape(shapeOf(targetNode)),
+      fixed: fixed(props.targetHandleId, props.targetX, props.targetY, props.targetPosition),
+    },
   )
   const path = edgePath(data?.path ?? 'bezier', ends.source, ends.target)
 

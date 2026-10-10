@@ -6,13 +6,13 @@
 
 **Done when (DESIGN §5):** build a 5-node graph, save it, reload the app, load the file, and see the identical graph.
 
-## 1. Graph JSON schema (schemaVersion 2) — approved
+## 1. Graph JSON schema (schemaVersion 3) — approved
 
-Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHandle`, and edge-type styles have `path` (added in v2, increment 2b).
+Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHandle`, edge-type styles have `path` (added in v2, increment 2b), and node types have `handles` (added in v3, DESIGN Phase 3 P3-4).
 
 ```jsonc
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "meta": { "name": "Untitled", "created": "ISO-8601", "modified": "ISO-8601" },
   "nodeTypes": [
     {
@@ -33,6 +33,9 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
           "default": "New Technology",
           "show": ["card"],
         },
+      ],
+      "handles": [
+        { "id": "in", "label": "In", "side": "left", "offset": 0.5, "direction": "in" },
       ],
     },
   ],
@@ -73,12 +76,13 @@ Same as DESIGN.md §4, except that edges also have `sourceHandle` and `targetHan
 - **S4.** IDs are `n_`/`e_` + `crypto.randomUUID()`.
 - **S5.** Unknown keys at every object level are kept on load and written back on save.
 - **S6.** Strict load: missing required keys, an unknown `typeId` or a dangling edge reference reject the whole file with a readable error. A newer `schemaVersion` is rejected. Older versions run through the migration chain.
-- **S7.** Self-loops and exact duplicate edges are rejected. Cycles are allowed (checks come in Phase 4).
+- **S7.** Self-loops and exact duplicate edges are rejected. Cycles are allowed (checks come in Phase 4). *(Schema v3, Phase 3 P3-4:)* "exact duplicate" means the same source, target, edge type **and handle ids**, so the same two nodes may be connected again through other named handles. An edge may not start at a named "in" handle or end at a named "out" handle; a handle id the node's type doesn't have is allowed (drawn as described in S12).
 - **S8.** Deleting a node deletes its edges.
 - **S9.** `meta.modified` is set when you save. The viewport is saved.
 - **S10.** Stable key order, 2-space indentation.
 - **S11 (v2).** `edgeTypes[].style.path` is one of `bezier | smoothstep | step | straight`; it sets the line shape for every edge of that type. A v1→v2 migration adds `"path": "bezier"`. Older files are upgraded on load through the migration chain in `src/model/migrations.ts`. Editing it in-app comes with DESIGN Phase 2's type editor.
-- **Load rules (increment 3, developer-approved assumptions).** Optional keys and their defaults: edge `sourceHandle`/`targetHandle` → `null`; node `data`/`styleOverrides` → `{}`; node-type `style.icon` → `null`; edge-type `semantics` → `null` and `style.dash` → `null`; `meta.created`/`modified` → load time. Everything else is required. Duplicate ids within a collection, duplicate field keys within a node type, and edges breaking S7 are rejected. Field definitions: `options` (non-empty) is required on `enum` fields and forbidden on others; `default` must suit the kind. `styleOverrides` keys are validated like the node style. Integrity checks run once the shape is valid. Not checked yet: node `data` values against field kinds (DESIGN Phase 2 inspector) and timestamp format.
+- **S12 (v3).** `nodeTypes[].handles` lists a type's named connection points: `id` (non-blank, unique within the type, never `top`/`right`/`bottom`/`left`, which are the generic side handles every node has), `label`, `side` (`top | right | bottom | left`), `offset` (0–1 along the side, from the top or left end; optional, default 0.5) and `direction` (`in | out | both`). An edge whose `sourceHandle`/`targetHandle` names one of its node's handles is drawn from that handle. A stored side id (`top`/`right`/`bottom`/`left`, e.g. from a hand-edited file) is drawn from that side, unless a named handle sits in the middle of that side (the node then has no side handle there). Null or any other id floats. Connections drawn in the editor store named handle ids only; an edge drawn from a side handle floats. A v2→v3 migration adds `"handles": []` to every node type.
+- **Load rules (increment 3, developer-approved assumptions).** Optional keys and their defaults: edge `sourceHandle`/`targetHandle` → `null`; node `data`/`styleOverrides` → `{}`; node-type `style.icon` → `null`; named handle `offset` → `0.5` (schema v3; `nodeTypes[].handles` itself is required and added as `[]` by the v2 → v3 migration); edge-type `semantics` → `null` and `style.dash` → `null`; `meta.created`/`modified` → load time. Everything else is required. Duplicate ids within a collection, duplicate field keys within a node type, and edges breaking S7 are rejected. Field definitions: `options` (non-empty) is required on `enum` fields and forbidden on others; `default` must suit the kind. `styleOverrides` keys are validated like the node style. Integrity checks run once the shape is valid. Not checked yet: node `data` values against field kinds (DESIGN Phase 2 inspector) and timestamp format.
 
 ## 2. Architecture decisions — approved
 

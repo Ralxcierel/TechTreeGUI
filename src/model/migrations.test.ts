@@ -79,3 +79,31 @@ describe('v1 → v2', () => {
     expect(v1ToV2({ schemaVersion: 1 })).toEqual({ schemaVersion: 2 })
   })
 })
+
+describe('v2 → v3', () => {
+  const v2ToV3 = MIGRATIONS[2]!
+
+  it('gives every node type an empty handle list, keeping everything else', () => {
+    const input = {
+      schemaVersion: 2,
+      extra: 'kept',
+      nodeTypes: [{ id: 'tech', fields: [] }],
+    }
+    expect(v2ToV3(input)).toEqual({
+      schemaVersion: 3,
+      extra: 'kept',
+      nodeTypes: [{ id: 'tech', fields: [], handles: [] }],
+    })
+    expect(input.schemaVersion).toBe(2)
+    expect('handles' in input.nodeTypes[0]!).toBe(false)
+  })
+
+  it('keeps existing handles and tolerates malformed entries', () => {
+    const out = v2ToV3({ schemaVersion: 2, nodeTypes: [{ id: 'a', handles: ['x'] }, 'junk'] })
+    expect(out.nodeTypes).toEqual([{ id: 'a', handles: ['x'] }, 'junk'])
+  })
+
+  it('tolerates a missing nodeTypes array (the validator reports it later)', () => {
+    expect(v2ToV3({ schemaVersion: 2 })).toEqual({ schemaVersion: 3 })
+  })
+})

@@ -3,12 +3,16 @@ import { MarkerType, type Edge, type EdgeChange, type Node, type NodeChange } fr
 import {
   deleteEdges,
   deleteNodes,
+  HANDLE_SIDES,
   moveNodes,
   type EdgePath,
   type EdgeType,
   type GraphDocument,
   type GraphEdge,
+  type GraphNode,
+  type HandleDef,
   type NodeStyle,
+  type NodeType,
   type Position,
 } from '../model'
 
@@ -93,11 +97,45 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
 }
 
 /**
- * The connection handles every node has, one per side. Dragging from any of them starts a
+ * The generic connection handles every node has, one per side. Dragging from any of them starts a
  * connection; the edge it creates floats (stores no handle id). An edge that does store one of these
- * ids is drawn from that fixed side.
+ * ids is drawn from that fixed side. A type's named handles (schema v3) are added on top.
  */
-export const SIDE_HANDLE_IDS: readonly string[] = ['top', 'right', 'bottom', 'left']
+export const SIDE_HANDLE_IDS: readonly string[] = HANDLE_SIDES
+
+/**
+ * The side handles a node of a type with these named handles gets: every side, except where a
+ * named handle sits in the middle of that side, exactly on the side handle's spot. React Flow
+ * snaps a dropped connection to the nearest handle, and two handles at one point are a near-tie
+ * it could break either way, attaching the edge to the wrong one.
+ */
+export function sideHandleIds(handles: readonly HandleDef[]): string[] {
+  return SIDE_HANDLE_IDS.filter((side) => !handles.some((h) => h.side === side && h.offset === 0.5))
+}
+
+/**
+ * The handle ids React Flow can find on each node whose type has named handles: those, plus the
+ * side handles they leave (see `sideHandleIds`). Nodes not in the map have the 4 side handles.
+ */
+export type HandleIdsByNode = ReadonlyMap<string, ReadonlySet<string>>
+
+export function handleIdsByNode(
+  nodes: readonly GraphNode[],
+  nodeTypes: readonly NodeType[],
+): HandleIdsByNode {
+  const byType = new Map<string, ReadonlySet<string>>()
+  for (const t of nodeTypes) {
+    if (t.handles.length > 0) {
+      byType.set(t.id, new Set([...t.handles.map((h) => h.id), ...sideHandleIds(t.handles)]))
+    }
+  }
+  const out = new Map<string, ReadonlySet<string>>()
+  for (const n of nodes) {
+    const ids = byType.get(n.typeId)
+    if (ids) out.set(n.id, ids)
+  }
+  return out
+}
 
 /** Line shapes the edge component can draw. A Set, so a bad value (even "toString") is unknown. */
 const EDGE_PATHS = new Set<EdgePath>(['bezier', 'smoothstep', 'step', 'straight'])
@@ -106,11 +144,13 @@ export type GraphEdgeData = { path: EdgePath }
 export type FlowEdge = Edge<GraphEdgeData, 'graph'>
 
 /**
- * A stored handle id React Flow can actually find on the node, or null (= floating). An unknown id
- * would make React Flow skip drawing the edge entirely.
+ * A stored handle id React Flow can actually find on the node (a side handle it has, or one of its
+ * type's named handles), or null (= floating). An unknown id would make React Flow skip the edge.
  */
-function knownHandle(id: string | null): string | null {
-  return id !== null && SIDE_HANDLE_IDS.includes(id) ? id : null
+function knownHandle(id: string | null, nodeId: string, handles: HandleIdsByNode): string | null {
+  if (id === null) return null
+  const ids = handles.get(nodeId)
+  return (ids ? ids.has(id) : SIDE_HANDLE_IDS.includes(id)) ? id : null
 }
 
 /** Builds React Flow edges, drawn by the `graph` edge component and styled from each edge's type. */
@@ -118,6 +158,7 @@ export function toFlowEdges(
   edges: readonly GraphEdge[],
   edgeTypes: readonly EdgeType[],
   selectedEdgeIds: ReadonlySet<string>,
+  handles: HandleIdsByNode = new Map(),
 ): FlowEdge[] {
   const typesById = new Map(edgeTypes.map((t) => [t.id, t]))
   return edges.map((e) => {
@@ -128,8 +169,8 @@ export function toFlowEdges(
       type: 'graph',
       source: e.source,
       target: e.target,
-      sourceHandle: knownHandle(e.sourceHandle),
-      targetHandle: knownHandle(e.targetHandle),
+      sourceHandle: knownHandle(e.sourceHandle, e.source, handles),
+      targetHandle: knownHandle(e.targetHandle, e.target, handles),
       selected,
       data: { path: style && EDGE_PATHS.has(style.path) ? style.path : 'bezier' },
     }
