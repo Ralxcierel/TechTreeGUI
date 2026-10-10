@@ -2,16 +2,16 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (session ended 2026-10-10, at the P4-1 review gate)
-1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (526 tests at hand-off).
-2. **Waiting on the developer: review of P4-1 (full validation), commit `fae3a1d`.** P4-0 was approved 2026-10-10.
-3. After approval: start **P4-2 (play mode, D6/D7)**. Restate it first, flag new decisions, build → test → self-review → independent review loop (max 3 rounds) → stop at the gate → push.
+## Resume here (session ended 2026-10-10, at the P4-2 review gate)
+1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (561 tests at hand-off).
+2. **Waiting on the developer: review of P4-2 (play mode), commit `6931ed0`.** P4-0 and P4-1 are approved (2026-10-10).
+3. After approval: start **P4-3 (schema v4: `layout.direction`, `layout.spacing`, `layout.tiers`, `nodes[].tierId`, migration v3 → v4 + round-trip test, Document inspector layout section, node Tier dropdown; D5)**. It is a schema change: restate it first and flag any new decision before building.
 4. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
 5. Shell gotcha (hit again on 2026-10-09): in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script. Prefer the Edit/Write tools for lines that contain escapes, and re-read the result.
 6. Browser pane gotcha: after `resize_window` to e.g. 1100×750 the page lays out at that size, but screenshots come out shrunk into a corner. Pointer input still works: screenshot-frame coordinates × (page width / 800) = page coordinates. Read positions with JavaScript (`getBoundingClientRect`) and click by `ref` where you can. At the pane's own size (about 400px wide) the canvas has no room.
 
 ## Where we are
-- **DESIGN Phase 4 (tech-tree features): P4-0 approved; P4-1 built, waiting for review.** `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
+- **DESIGN Phase 4 (tech-tree features): P4-0 and P4-1 approved; P4-2 built, waiting for review.** `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
   - Skeleton P4-0: cycle detection on prerequisite edges → Problems panel → marked cards (no schema change).
   - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
 - **DESIGN Phase 3 is complete and approved** (2026-10-09). Plan `docs/PLAN-phase3.md`; all of P3-0 to P3-5 approved. The developer chose to keep the "no generic side dot under a centred named handle" behaviour from P3-4.
@@ -19,6 +19,17 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
 ## Done (DESIGN Phase 4, in progress)
+- **P4-2 play mode** (commit `6931ed0`, waiting for the developer's review):
+  - `tree.ts` (pure): `PlayState` (`outside | blocked | locked | available | unlocked`), `playStates(doc, unlocked, problems?)` (D3/D4/D7), `toggleUnlocked(doc, unlocked, id, states?)` (unlock an available node; re-lock an unlocked one plus every unlocked dependent; otherwise the same set), `nodeCost` + `COST_KEY` (D6: the type's `cost` field must be kind number; non-finite → 0).
+  - Store: `playing`, `unlockedIds`, `setPlaying` (always empties the set), `togglePlayUnlock`; `selectPlayStates` memoised on the problems array + unlocked set. `loadDocument`/`newDocument` end play mode. Backstop: while playing, node/edge changes other than select/dimensions and `connect` are ignored.
+  - `PlayBar.tsx` in the toolbar: "▶ Play" / "■ Stop playing" (glyph aria-hidden, names "Play"/"Stop playing") and an always-present `role="status"` "Unlocked n / m · Cost total c" (m = tree nodes incl. blocked; total rounded to 6 decimals).
+  - Canvas in play: `nodesDraggable`/`nodesConnectable` off, `deleteKeyCode` null, `zoomOnDoubleClick` off, no box selection, Controls lock button hidden; `onNodeClick` toggles (second click of a double-click ignored); Enter/Space on a focused node toggles (not on key repeat; not from controls inside the card).
+  - Cards: `graph-node--play-<state>` (locked dimmed 0.45, available accent outline, unlocked outline + tint + ✓ badge at the top-right or on a circle's outline, blocked dashed red outline, outside 0.25); screen-reader text per state; on-card text and dropdowns read-only; cycle mark replaced by the play state; handles hidden; pointer cursor only on available/unlocked.
+  - Read-only document: Add node disabled; Library type lists and the inspector inside `<fieldset class="plain-fieldset" role="presentation" disabled>`; the inspector says "Play mode: editing is off." and still shows the clicked node. Problems panel, Save, Load, New work.
+  - 561 tests (incl. `Canvas.play.test.tsx`, which renders the real canvas in jsdom with a ResizeObserver stub). Delete-key behaviour can't be tested in jsdom (React Flow's key handling doesn't run there), so it was checked in the browser.
+  - In the browser (tree built through store actions from the console; Play, node clicks, drag, Delete, Enter/Space with real input): roots available, Bronze locked until both Fire and Wheel unlocked; totals 10 → 80; re-locking Fire re-locked Bronze (20); drag and Delete changed nothing; handles hidden; inspector and Library disabled; Stop restored the editor; Enter unlocked and Space re-locked a focused node.
+  - Independent review, 3 rounds. Round 1 (no bugs): **keyboard users couldn't unlock** (React Flow's Enter only selects) → Enter/Space handler; double-click toggled twice and zoomed; glyphs in the button name; pointer cursor everywhere; findProblems computed twice per click; duplicate import; no canvas wiring test. Round 2 found **a bug**: the Controls lock button could re-enable dragging during play (it writes into React Flow's store) → hidden in play + store backstop; the cursor rule had no effect (React Flow's `.selectable` rule) → fixed; key repeat; check mark on circles; unnamed fieldsets. Round 3 (no bugs): applied without another review: no box selection in play, clearer "Unlocked" text, unlocked count taken from the states.
+  - Known and accepted: if the canvas was locked with the Controls lock before Play, stopping play turns dragging/connecting back on; a node whose type is missing shows "Unknown type" without play styling; an open type editor's Done link is disabled during play (clicking a node closes it); disabled inspector inputs can't be focused or copied by screen readers.
 - **P4-1 full validation** (commit `fae3a1d`, waiting for the developer's review):
   - `tree.ts`: `treeNodeIds` (D3: nodes of any type used at either end of a prerequisite edge). `findProblems` now returns cycles, then `blocked` (not in a cycle, but a prerequisite directly or further back is; `blockedBy` = its direct prerequisites that are in a cycle or blocked, once each, edge order), then `orphan` (tree-type node with no prerequisite edges), each in document order.
   - Texts: "Can never be unlocked: Bronze (needs Smelting)", "Orphan: Writing (no prerequisite links)". Clicking selects that one node and pans to it.
@@ -244,7 +255,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 ## Open items
 ### Phase 4
 - Plan approved 2026-10-10 (all recommended). The decisions D1–D12, assumptions and Q1–Q5 answers are in `docs/PLAN-phase4.md` §4–6.
-- **Waiting:** developer review of P4-1.
+- **Waiting:** developer review of P4-2.
+- **[ASSUMPTION]** (P4-2) The whole document is read-only while playing (Add node, Library type lists and inspector disabled; Problems panel, Save, Load, New work). New and Load end play mode. "n / m": m counts every tree node, blocked ones included.
 - **[ASSUMPTION]** (P4-1) One panel entry per never-unlockable node and per orphan; order: cycles, then never-unlockable, then orphans. Only cycle nodes and edges are marked on the canvas.
 - **[ASSUMPTION]** (P4-0) A cycle problem is one strongly connected group: clicking it selects every node of the group; the text shows one shortest loop through the group's first node (document order) and counts the rest.
 - **[ASSUMPTION]** (P4-0) The Problems panel starts open; its open/closed state isn't remembered.
