@@ -17,6 +17,9 @@ import {
   deleteEdgeType,
   deleteNodeType,
   findProblems,
+  resolveNodeStyle,
+  moveNodes,
+  treeNodeIds,
   playStates,
   toggleUnlocked,
   moveField,
@@ -66,8 +69,10 @@ import {
   toFlowNodes,
   uiForLoadedDocument,
   type FlowNode,
+  type Size,
   type UiState,
 } from './flowAdapter'
+import { dropInLane, lanes, positionInTier } from './lanes'
 
 /** A type opened in the inspector from the Library (instead of the canvas selection). */
 export type Editing = { kind: 'edgeType' | 'nodeType'; id: string }
@@ -173,8 +178,13 @@ interface EditorState {
   moveTier: (tierId: string, by: -1 | 1) => void
   /** Removes a tier; its nodes lose their tier but don't move. */
   removeTier: (tierId: string) => void
-  /** Puts a node in a tier, or in none with null. */
+  /** Puts a node in a tier (moving it into the tier's lane), or in none with null (no move). */
   setNodeTier: (nodeId: string, tierId: string | null) => void
+  /**
+   * After a drag: each dropped tree node snaps into the lane under its centre and takes that tier,
+   * or loses its tier outside every lane (D9). Nothing happens without lanes or in play mode.
+   */
+  dropNodes: (nodeIds: readonly string[]) => void
   /** Renames the document (also the save file name). */
   setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
@@ -214,6 +224,15 @@ export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'
   return types[0]?.id ?? null
 }
 
+/** A node's size for lane snapping: as measured on screen, else its type's width × 60. */
+function nodeSize(doc: GraphDocument, ui: UiState, node: GraphDocument['nodes'][number]): Size {
+  const measured = ui.measured.get(node.id)
+  if (measured) return measured
+  const type = doc.nodeTypes.find((t) => t.id === node.typeId)
+  const width = type ? resolveNodeStyle(type.style, node.styleOverrides).width : 200
+  return { width, height: 60 }
+}
+
 /** Cached inputs and result of `selectProblems`. */
 let problemsCache: {
   doc: GraphDocument
@@ -221,6 +240,8 @@ let problemsCache: {
   edgeTypes: GraphDocument['edgeTypes']
   nodeIds: readonly string[]
   nodeTypeIds: readonly string[]
+  nodeTierIds: readonly (string | null)[]
+  tiers: GraphDocument['layout']['tiers']
   problems: readonly TreeProblem[]
   cycleNodeIds: ReadonlySet<string>
   cycleEdgeIds: ReadonlySet<string>
@@ -228,8 +249,8 @@ let problemsCache: {
 
 /**
  * The tech-tree problems of the open document (Phase 4), recomputed only when the edges, the edge
- * types or the list of node ids and their types change: dragging or editing a node keeps the same
- * result object, so the Problems panel, the cards and the edges don't re-render.
+ * types, the tiers, or the list of node ids, types and tiers change: dragging or editing a node
+ * keeps the same result object, so the Problems panel, the cards and the edges don't re-render.
  */
 function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
   const c = problemsCache
@@ -239,8 +260,12 @@ function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
     c &&
     c.edges === doc.edges &&
     c.edgeTypes === doc.edgeTypes &&
+    c.tiers === doc.layout.tiers &&
     c.nodeIds.length === doc.nodes.length &&
-    doc.nodes.every((n, i) => n.id === c.nodeIds[i] && n.typeId === c.nodeTypeIds[i])
+    doc.nodes.every(
+      (n, i) =>
+        n.id === c.nodeIds[i] && n.typeId === c.nodeTypeIds[i] && n.tierId === c.nodeTierIds[i],
+    )
   ) {
     problemsCache = { ...c, doc }
     return problemsCache
@@ -253,6 +278,8 @@ function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
     edgeTypes: doc.edgeTypes,
     nodeIds: doc.nodes.map((n) => n.id),
     nodeTypeIds: doc.nodes.map((n) => n.typeId),
+    nodeTierIds: doc.nodes.map((n) => n.tierId),
+    tiers: doc.layout.tiers,
     problems,
     cycleNodeIds: new Set(cycles.flatMap((p) => p.nodeIds)),
     cycleEdgeIds: new Set(cycles.flatMap((p) => p.edgeIds)),
@@ -522,7 +549,39 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     moveTier: (tierId, by) => set((s) => derive(s, moveTier(s.doc, tierId, by), s.ui)),
     removeTier: (tierId) => set((s) => derive(s, removeTier(s.doc, tierId), s.ui)),
     setNodeTier: (nodeId, tierId) =>
-      set((s) => derive(s, setNodeTier(s.doc, nodeId, tierId), s.ui)),
+      set((s) => {
+        if (s.playing) return s // the document is read-only in play mode
+        let doc = setNodeTier(s.doc, nodeId, tierId)
+        // Picking a tier also moves the node into its lane (D9); "no tier" leaves it in place.
+        const node = doc.nodes.find((n) => n.id === nodeId)
+        const at =
+          node && tierId !== null
+            ? positionInTier(doc.layout, tierId, node.position, nodeSize(doc, s.ui, node))
+            : null
+        if (node && at && (at.x !== node.position.x || at.y !== node.position.y)) {
+          doc = moveNodes(doc, new Map([[nodeId, at]]))
+        }
+        return derive(s, doc, s.ui)
+      }),
+    dropNodes: (nodeIds) =>
+      set((s) => {
+        // No lanes (radial, or no tiers): dropping changes nothing.
+        if (s.playing || lanes(s.doc.layout).length === 0) return s
+        const tree = treeNodeIds(s.doc)
+        const moves = new Map<string, Position>()
+        let doc = s.doc
+        for (const id of nodeIds) {
+          const node = doc.nodes.find((n) => n.id === id)
+          // Only tree nodes snap and change tier (developer's choice for P4-4).
+          if (!node || !tree.has(id)) continue
+          const drop = dropInLane(doc.layout, node.position, nodeSize(doc, s.ui, node))
+          if (!drop) continue
+          doc = setNodeTier(doc, id, drop.tierId)
+          if (drop.position !== node.position) moves.set(id, drop.position)
+        }
+        if (moves.size > 0) doc = moveNodes(doc, moves)
+        return derive(s, doc, s.ui)
+      }),
     setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
     loadDocument: (doc) =>
       set((s) => {

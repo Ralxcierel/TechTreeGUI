@@ -12,6 +12,7 @@ import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapt
 import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
+import { TierLanes } from './TierLanes'
 
 // Defined outside the component so React Flow sees the same object on every render.
 const nodeTypes = { graph: GraphNode }
@@ -31,6 +32,7 @@ export function Canvas() {
   const isValidConnection = useEditorStore((s) => s.isValidConnection)
   const playing = useEditorStore((s) => s.playing)
   const togglePlayUnlock = useEditorStore((s) => s.togglePlayUnlock)
+  const dropNodes = useEditorStore((s) => s.dropNodes)
   // Read once: the canvas starts at the document's saved viewport; later loads set it explicitly.
   // The live viewport is copied back into the document only on Save (see Toolbar).
   const [initialViewport] = useState(() => useEditorStore.getState().doc.view.viewport)
@@ -88,6 +90,8 @@ export function Canvas() {
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodesChange={onNodesChange}
+        // Dropped nodes snap into the tier lane under them (D9); `nodes` are all the dragged ones.
+        onNodeDragStop={(_, _node, nodes) => dropNodes(nodes.map((n) => n.id))}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectStart={() => setConnecting(true)}
@@ -106,6 +110,7 @@ export function Canvas() {
         colorMode="dark"
       >
         <Background variant={BackgroundVariant.Dots} gap={20} />
+        <TierLanes />
         {/* No lock button while playing: it writes straight into React Flow's own settings and
             could turn dragging back on. */}
         <Controls showInteractive={!playing} />

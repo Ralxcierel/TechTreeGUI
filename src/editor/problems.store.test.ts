@@ -170,6 +170,23 @@ describe('selectProblems: P4-1 validation', () => {
   })
 })
 
+describe('selectProblems: tier order (Q5)', () => {
+  it('warns about a prerequisite in a later tier, naming both tiers, and follows renames', () => {
+    const [a, b] = nodes('Writing', 'Iron')
+    link(b!, a!) // Iron is a prerequisite of Writing
+    s().addTier('Ancient')
+    s().addTier('Medieval')
+    s().setNodeTier(a!, 'ancient')
+    s().setNodeTier(b!, 'medieval')
+    const texts = () => problemTexts(s().doc, selectProblems(s()))
+    expect(texts()).toEqual(['Tier order: Writing (Ancient) needs Iron (Medieval), a later tier'])
+    s().renameTier('medieval', 'Iron Age')
+    expect(texts()).toEqual(['Tier order: Writing (Ancient) needs Iron (Iron Age), a later tier'])
+    s().moveTier('medieval', -1)
+    expect(texts()).toEqual([])
+  })
+})
+
 describe('selectNodes', () => {
   it('selects exactly the given nodes, clears selected edges and closes an open type', () => {
     const [a, b, c] = nodes('A', 'B', 'C')

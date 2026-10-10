@@ -2,7 +2,7 @@
 // Clicking an entry selects the nodes involved and pans the view to them.
 import { useReactFlow } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
-import { problemTexts } from '../../editor/problems'
+import { problemKey, problemTexts } from '../../editor/problems'
 import { selectProblems, useEditorStore } from '../../editor/store'
 import type { TreeProblem } from '../../model'
 
@@ -38,7 +38,7 @@ export function ProblemsPanel() {
         ) : (
           <ul className="problems__list">
             {problems.map((p, i) => (
-              <li key={`${p.kind}:${p.nodeIds[0]}`}>
+              <li key={problemKey(p)}>
                 <button type="button" className="problems__item" onClick={() => show(p)}>
                   <span aria-hidden="true">⚠ </span>
                   {texts[i]}

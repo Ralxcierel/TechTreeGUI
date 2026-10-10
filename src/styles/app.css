@@ -983,3 +983,62 @@ body,
   opacity: 0.4;
   cursor: default;
 }
+
+/* Tier lanes (Phase 4, D9): bands behind the nodes, above the dotted background. z-index 0 keeps
+   them under React Flow's renderer (z-index 4), so they never catch clicks or drags. */
+.tier-lanes {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tier-lanes__lane {
+  position: absolute;
+  overflow: hidden;
+  border-color: rgb(148 163 184 / 0.35);
+  border-style: dashed;
+  border-width: 0;
+}
+
+.tier-lanes__lane--y {
+  border-top-width: 1px;
+}
+
+.tier-lanes__lane--y.tier-lanes__lane--last {
+  border-bottom-width: 1px;
+}
+
+.tier-lanes__lane--x {
+  border-left-width: 1px;
+}
+
+.tier-lanes__lane--x.tier-lanes__lane--last {
+  border-right-width: 1px;
+}
+
+.tier-lanes__lane--even {
+  background: rgb(56 189 248 / 0.05);
+}
+
+.tier-lanes__lane--odd {
+  background: rgb(148 163 184 / 0.07);
+}
+
+/* The name sits at the canvas edge: left for horizontal bands, top for vertical ones (the band
+   spans the whole canvas that way); along the lane it is placed inline by TierLanes. */
+.tier-lanes__name {
+  position: absolute;
+  max-width: calc(100% - 28px); /* horizontal bands; vertical ones set it inline */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 6px 8px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--panel);
+  border-radius: 4px;
+  white-space: nowrap;
+}

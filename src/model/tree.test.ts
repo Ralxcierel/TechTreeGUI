@@ -227,6 +227,56 @@ describe('findProblems', () => {
   })
 })
 
+describe('findProblems: tier order (Q5)', () => {
+  /** a → b → c with tiers t1 < t2 < t3 assigned as given. */
+  function tiered(tiers: Record<string, string | null>) {
+    const doc = graph(['a', 'b', 'c'], ['a>b', 'b>c'])
+    return {
+      ...doc,
+      layout: {
+        ...doc.layout,
+        tiers: [
+          { id: 't1', name: 'Ancient' },
+          { id: 't2', name: 'Classical' },
+          { id: 't3', name: 'Medieval' },
+        ],
+      },
+      nodes: doc.nodes.map((n) => ({ ...n, tierId: tiers[n.id] ?? null })),
+    }
+  }
+
+  it('reports a prerequisite in a later tier than the node it unlocks', () => {
+    expect(findProblems(tiered({ a: 't3', b: 't1' }))).toEqual([
+      { kind: 'tier-order', nodeIds: ['b', 'a'], edgeId: 'prereq:a>b', tierIds: ['t1', 't3'] },
+    ])
+  })
+
+  it('accepts the same tier, an earlier one, untiered nodes and unknown tiers', () => {
+    expect(findProblems(tiered({ a: 't1', b: 't1', c: 't3' }))).toEqual([])
+    expect(findProblems(tiered({ a: 't3', b: null, c: 't1' }))).toEqual([])
+    expect(findProblems(tiered({ a: 'lost', b: 't1' }))).toEqual([])
+  })
+
+  it('comes after cycles and nodes behind them, and before orphans, in edge order', () => {
+    let doc = tiered({ a: 't3', b: 't2', c: 't1' })
+    doc = addNode(doc, 'technology', { x: 0, y: 0 }, 'lone')
+    for (const id of ['p', 'q', 'r']) doc = addNode(doc, 'technology', { x: 0, y: 0 }, id)
+    doc = withEdges(doc, ['p>q', 'q>p', 'q>r'], 'prereq')
+    expect(findProblems(doc).map((p) => [p.kind, p.nodeIds[0]])).toEqual([
+      ['cycle', 'p'],
+      ['blocked', 'r'],
+      ['tier-order', 'b'],
+      ['tier-order', 'c'],
+      ['orphan', 'lone'],
+    ])
+  })
+
+  it("doesn't change play mode: such nodes can still be unlocked", () => {
+    const doc = tiered({ a: 't3', b: 't1' })
+    expect(Object.fromEntries(playStates(doc, new Set()))).toMatchObject({ a: 'available' })
+  })
+})
+
 describe('playStates', () => {
   // fire → smelting → bronze, and wheel → bronze (bronze needs both); writing has no links.
   const tree = () =>

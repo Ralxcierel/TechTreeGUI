@@ -1,6 +1,6 @@
 // The prerequisite graph of a tech tree (DESIGN Phase 4): which edges are prerequisites, and the
 // problems in their structure. Pure functions over the document; nothing here changes it.
-import type { EdgeType, GraphDocument, GraphEdge } from './types'
+import type { EdgeType, GraphDocument, GraphEdge, LayoutSettings } from './types'
 
 /** The edge-type meaning that marks prerequisite edges (decision D2 of Phase 4). */
 export const PREREQUISITE = 'prerequisite'
@@ -206,18 +206,33 @@ export type TreeProblem =
       blockedBy: string[]
     }
   | {
+      /**
+       * A prerequisite edge whose source sits in a later tier than its target (question Q5 of
+       * Phase 4), e.g. a Medieval prerequisite for an Ancient tech. Only nodes in known tiers count.
+       */
+      kind: 'tier-order'
+      /** The node that needs the prerequisite, then the prerequisite. */
+      nodeIds: [string, string]
+      edgeId: string
+      /** The tiers of the two nodes, in the same order. */
+      tierIds: [string, string]
+    }
+  | {
       /** A node of a tree type (D3) with no prerequisite edges at all. */
       kind: 'orphan'
       nodeIds: [string]
     }
 
+/** What the tree checks read: the graph, and the tiers when the document has them. */
+export type TreeDocument = Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'> & {
+  layout?: Pick<LayoutSettings, 'tiers'>
+}
+
 /**
  * Every problem in the document's prerequisite structure: cycles, then nodes that can never be
- * unlocked, then orphans, each in document order.
+ * unlocked, then prerequisites in a later tier (edge order), then orphans, each in document order.
  */
-export function findProblems(
-  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
-): TreeProblem[] {
+export function findProblems(doc: TreeDocument): TreeProblem[] {
   const edges = prerequisiteEdges(doc)
   const cycles = findCycles(doc)
   const inCycle = new Set(cycles.flatMap((c) => c.nodeIds))
@@ -249,8 +264,33 @@ export function findProblems(
       problems.push({ kind: 'blocked', nodeIds: [n.id], blockedBy: blockers.get(n.id)! })
     }
   }
+  problems.push(...tierOrderProblems(doc, edges))
   for (const n of doc.nodes) {
     if (tree.has(n.id) && !linked.has(n.id)) problems.push({ kind: 'orphan', nodeIds: [n.id] })
+  }
+  return problems
+}
+
+/** Prerequisite edges going from a later tier to an earlier one (Q5). */
+function tierOrderProblems(doc: TreeDocument, edges: readonly GraphEdge[]): TreeProblem[] {
+  const tiers = doc.layout?.tiers ?? []
+  if (tiers.length < 2) return []
+  const rank = new Map(tiers.map((t, i) => [t.id, i]))
+  const tierOf = new Map(doc.nodes.map((n) => [n.id, n.tierId]))
+  const problems: TreeProblem[] = []
+  for (const e of edges) {
+    const sourceTier = tierOf.get(e.source) ?? null
+    const targetTier = tierOf.get(e.target) ?? null
+    if (sourceTier === null || targetTier === null) continue
+    const s = rank.get(sourceTier)
+    const t = rank.get(targetTier)
+    if (s === undefined || t === undefined || s <= t) continue
+    problems.push({
+      kind: 'tier-order',
+      nodeIds: [e.target, e.source],
+      edgeId: e.id,
+      tierIds: [targetTier, sourceTier],
+    })
   }
   return problems
 }
@@ -267,13 +307,15 @@ export type PlayState = 'outside' | 'blocked' | 'locked' | 'available' | 'unlock
  * `problems` may be passed when already known (it must be `findProblems(doc)`).
  */
 export function playStates(
-  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
+  doc: TreeDocument,
   unlocked: ReadonlySet<string>,
   problems: readonly TreeProblem[] = findProblems(doc),
 ): Map<string, PlayState> {
   const edges = prerequisiteEdges(doc)
   const tree = treeNodes(doc, edges)
-  const stuck = new Set(problems.filter((p) => p.kind !== 'orphan').flatMap((p) => p.nodeIds))
+  const stuck = new Set(
+    problems.filter((p) => p.kind === 'cycle' || p.kind === 'blocked').flatMap((p) => p.nodeIds),
+  )
   const prerequisites = new Map<string, string[]>()
   for (const e of edges) {
     const list = prerequisites.get(e.target)
@@ -300,7 +342,7 @@ export function playStates(
  * passed when already known (it must be `playStates(doc, unlocked)`).
  */
 export function toggleUnlocked(
-  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
+  doc: TreeDocument,
   unlocked: ReadonlySet<string>,
   nodeId: string,
   states: ReadonlyMap<string, PlayState> = playStates(doc, unlocked),
