@@ -18,6 +18,8 @@ import {
 
 /** Colour of a selected edge and its arrowheads (matches `--accent` in styles/app.css). */
 export const SELECTED_EDGE_COLOR = '#38bdf8'
+/** Colour of an edge in a prerequisite cycle and its arrowheads (matches `--error`). */
+export const CYCLE_EDGE_COLOR = '#f87171'
 
 export type GraphNodeData = {
   typeId: string
@@ -153,12 +155,16 @@ function knownHandle(id: string | null, nodeId: string, handles: HandleIdsByNode
   return (ids ? ids.has(id) : SIDE_HANDLE_IDS.includes(id)) ? id : null
 }
 
-/** Builds React Flow edges, drawn by the `graph` edge component and styled from each edge's type. */
+/**
+ * Builds React Flow edges, drawn by the `graph` edge component and styled from each edge's type.
+ * Edges in a prerequisite cycle (`cycleEdgeIds`) are drawn in the error colour, unless selected.
+ */
 export function toFlowEdges(
   edges: readonly GraphEdge[],
   edgeTypes: readonly EdgeType[],
   selectedEdgeIds: ReadonlySet<string>,
   handles: HandleIdsByNode = new Map(),
+  cycleEdgeIds: ReadonlySet<string> = new Set(),
 ): FlowEdge[] {
   const typesById = new Map(edgeTypes.map((t) => [t.id, t]))
   return edges.map((e) => {
@@ -177,7 +183,11 @@ export function toFlowEdges(
     if (!style) return flowEdge
 
     // Selection recolours the line and its arrowheads; markers can't be restyled from CSS.
-    const color = selected ? SELECTED_EDGE_COLOR : style.stroke
+    const color = selected
+      ? SELECTED_EDGE_COLOR
+      : cycleEdgeIds.has(e.id)
+        ? CYCLE_EDGE_COLOR
+        : style.stroke
     const marker = { type: MarkerType.ArrowClosed, color }
     flowEdge.style = {
       stroke: color,

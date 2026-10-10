@@ -1,7 +1,7 @@
 // Tech-tree problems as the store derives them (Phase 4), and selecting a problem's nodes.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { problemTexts } from './problems'
-import { selectCycleNodeIds, selectProblems, useEditorStore } from './store'
+import { selectCycleEdgeIds, selectCycleNodeIds, selectProblems, useEditorStore } from './store'
 
 const store = useEditorStore
 const s = () => store.getState()
@@ -63,6 +63,7 @@ describe('selectProblems', () => {
     link(b!, a!)
     s().updateEdgeType('prereq', { semantics: 'related' })
     expect(selectProblems(s())).toEqual([])
+    expect(selectCycleEdgeIds(s()).size).toBe(0)
     s().updateEdgeType('prereq', { semantics: 'Prerequisite' })
     expect(selectProblems(s())).toHaveLength(1)
   })
@@ -112,6 +113,59 @@ describe('selectProblems', () => {
     link(a!, b!)
     link(b!, a!)
     s().newDocument()
+    expect(selectProblems(s())).toEqual([])
+  })
+})
+
+describe('selectProblems: P4-1 validation', () => {
+  it('lists the cycle, the nodes behind it and an orphan, and clears them when the cycle opens', () => {
+    const [a, b, c, lone] = nodes('A', 'B', 'C', 'Lone')
+    link(a!, b!)
+    link(b!, a!)
+    link(b!, c!)
+    const texts = () => problemTexts(s().doc, selectProblems(s()))
+    expect(texts()).toEqual([
+      'Cycle: A → B → A',
+      'Can never be unlocked: C (needs B)',
+      'Orphan: Lone (no prerequisite links)',
+    ])
+    expect(selectProblems(s()).at(-1)!.nodeIds).toEqual([lone])
+
+    const back = s().doc.edges.find((e) => e.source === b && e.target === a)!.id
+    s().onEdgesChange([{ type: 'remove', id: back }])
+    expect(texts()).toEqual(['Orphan: Lone (no prerequisite links)'])
+    link(lone!, a!)
+    expect(texts()).toEqual([])
+  })
+
+  it('knows which edges are in a cycle', () => {
+    const [a, b, c] = nodes('A', 'B', 'C')
+    link(a!, b!)
+    link(b!, a!)
+    link(b!, c!)
+    const inCycle = s()
+      .doc.edges.filter((e) => selectCycleEdgeIds(s()).has(e.id))
+      .map((e) => [e.source, e.target])
+    expect(inCycle).toEqual([
+      [a, b],
+      [b, a],
+    ])
+    // Same object while nodes only move.
+    const before = selectCycleEdgeIds(s())
+    s().onNodesChange([{ type: 'position', id: c!, position: { x: 9, y: 9 } }])
+    expect(selectCycleEdgeIds(s())).toBe(before)
+  })
+
+  it('recomputes when a loaded document changes only node types', () => {
+    const [a, b, c] = nodes('A', 'B', 'C')
+    link(a!, b!)
+    expect(selectProblems(s()).map((p) => p.kind)).toEqual(['orphan'])
+    const doc = s().doc
+    // Same edges and edge types, same node ids; C is now a Note (not a tree type).
+    s().loadDocument({
+      ...doc,
+      nodes: doc.nodes.map((n) => (n.id === c ? { ...n, typeId: 'note' } : n)),
+    })
     expect(selectProblems(s())).toEqual([])
   })
 })

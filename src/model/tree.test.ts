@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
 import { createEdgeType, updateEdgeType } from './edgeTypes'
 import { addNode, connect } from './operations'
-import { findCycles, findProblems, isPrerequisiteType, prerequisiteEdges } from './tree'
+import {
+  findCycles,
+  findProblems,
+  isPrerequisiteType,
+  prerequisiteEdges,
+  treeNodeIds,
+} from './tree'
 import type { EdgeType, GraphDocument } from './types'
 
 /** A document with nodes `ids` and edges written "a>b" (prerequisite type unless given). */
@@ -141,16 +147,79 @@ describe('findCycles', () => {
   })
 })
 
+describe('treeNodeIds', () => {
+  it('is every node of a type used at either end of a prerequisite edge', () => {
+    let doc = graph(['a', 'b', 'lone'], ['a>b'])
+    doc = addNode(doc, 'note', { x: 0, y: 0 }, 'memo')
+    doc = addNode(doc, 'era', { x: 0, y: 0 }, 'age')
+    expect([...treeNodeIds(doc)]).toEqual(['a', 'b', 'lone'])
+    doc = withEdges(doc, ['age>a'], 'prereq')
+    expect([...treeNodeIds(doc)]).toEqual(['a', 'b', 'lone', 'age'])
+  })
+
+  it('is empty without prerequisite edges', () => {
+    const created = createEdgeType(graph(['a', 'b'], []), 'Related')
+    expect(treeNodeIds(withEdges(created.doc, ['a>b'], created.id)).size).toBe(0)
+  })
+})
+
 describe('findProblems', () => {
-  it('reports each cycle as a problem', () => {
-    const problems = findProblems(graph(['a', 'b', 'c'], ['a>b', 'b>a']))
-    expect(problems).toEqual([
+  it('reports nothing for a healthy tree', () => {
+    expect(findProblems(graph(['a', 'b', 'c', 'd'], ['a>b', 'a>c', 'b>d', 'c>d']))).toEqual([])
+  })
+
+  it('reports cycles, then nodes behind them, then orphans', () => {
+    // root → a ⇄ b → c → d; e is a lone technology.
+    const doc = graph(['e', 'd', 'c', 'root', 'a', 'b'], ['root>a', 'a>b', 'b>a', 'b>c', 'c>d'])
+    expect(findProblems(doc)).toEqual([
       {
         kind: 'cycle',
         nodeIds: ['a', 'b'],
         edgeIds: ['prereq:a>b', 'prereq:b>a'],
         path: ['a', 'b', 'a'],
       },
+      { kind: 'blocked', nodeIds: ['d'], blockedBy: ['c'] },
+      { kind: 'blocked', nodeIds: ['c'], blockedBy: ['b'] },
+      { kind: 'orphan', nodeIds: ['e'] },
     ])
+  })
+
+  it('names only the blocked prerequisites of a blocked node, once each', () => {
+    // x needs a (in a cycle) and ok (fine); two parallel edges a → x through named handles.
+    let doc = graph(['a', 'b', 'ok', 'x'], ['a>b', 'b>a', 'ok>x', 'a>x'])
+    doc = {
+      ...doc,
+      edges: [...doc.edges, { ...doc.edges.at(-1)!, id: 'again', sourceHandle: 'out' }],
+    }
+    expect(findProblems(doc).filter((p) => p.kind === 'blocked')).toEqual([
+      { kind: 'blocked', nodeIds: ['x'], blockedBy: ['a'] },
+    ])
+  })
+
+  it('lists every blocked prerequisite when a node sits behind two cycles', () => {
+    const doc = graph(['a', 'b', 'c', 'd', 'x'], ['a>b', 'b>a', 'c>d', 'd>c', 'b>x', 'd>x'])
+    expect(findProblems(doc).filter((p) => p.kind !== 'cycle')).toEqual([
+      { kind: 'blocked', nodeIds: ['x'], blockedBy: ['b', 'd'] },
+    ])
+  })
+
+  it('does not report a node in a cycle as blocked by another cycle', () => {
+    // a ⇄ b → c ⇄ d: c and d are their own cycle, not "blocked".
+    const doc = graph(['a', 'b', 'c', 'd'], ['a>b', 'b>a', 'b>c', 'c>d', 'd>c'])
+    expect(findProblems(doc).map((p) => p.kind)).toEqual(['cycle', 'cycle'])
+  })
+
+  it('ignores nodes of types never used by prerequisite edges', () => {
+    let doc = graph(['a', 'b'], ['a>b'])
+    doc = addNode(doc, 'note', { x: 0, y: 0 }, 'memo')
+    expect(findProblems(doc)).toEqual([])
+  })
+
+  it('reports orphans only once prerequisites exist, and not via other edge types', () => {
+    const created = createEdgeType(graph(['a', 'b', 'c'], []), 'Related')
+    let doc = withEdges(created.doc, ['a>c'], created.id)
+    expect(findProblems(doc)).toEqual([])
+    doc = withEdges(doc, ['a>b'], 'prereq')
+    expect(findProblems(doc)).toEqual([{ kind: 'orphan', nodeIds: ['c'] }])
   })
 })

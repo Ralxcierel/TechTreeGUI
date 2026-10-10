@@ -91,6 +91,27 @@ describe('ProblemsPanel', () => {
     )
   })
 
+  it('lists nodes behind a cycle and orphans, and selects the one node of such an entry', () => {
+    const [, smelting] = loop('Fire', 'Smelting')
+    s().addNode('technology', { x: 0, y: 0 })
+    const lone = s().doc.nodes.at(-1)!.id
+    s().setNodeField(lone, 'title', 'Writing')
+    s().addNode('technology', { x: 0, y: 0 })
+    const bronze = s().doc.nodes.at(-1)!.id
+    s().setNodeField(bronze, 'title', 'Bronze')
+    s().connect({ source: smelting!, target: bronze, sourceHandle: null, targetHandle: null })
+    renderPanel()
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      '⚠ Cycle: Fire → Smelting → Fire',
+      '⚠ Can never be unlocked: Bronze (needs Smelting)',
+      '⚠ Orphan: Writing (no prerequisite links)',
+    ])
+    expect(screen.getByText('3')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Orphan: Writing/ }))
+    expect([...s().ui.selectedNodeIds]).toEqual([lone])
+    expect(fitView).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: lone }] }))
+  })
+
   it('starts open and can be collapsed', () => {
     renderPanel()
     const details = screen.getByRole('group')

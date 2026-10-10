@@ -173,12 +173,84 @@ function loopThrough(start: string, edges: readonly GraphEdge[]): string[] {
   return [start] // unreachable for a real group: every member lies on a loop
 }
 
-/** A structural problem in the tech tree, shown in the Problems panel. */
-export type TreeProblem = { kind: 'cycle' } & PrerequisiteCycle
+/**
+ * The nodes that are part of the tech tree (decision D3 of Phase 4): nodes of any node type that
+ * appears at either end of at least one prerequisite edge. Other nodes (e.g. notes) are ignored by
+ * the tree checks (and, once they exist, by play mode and auto-layout).
+ */
+export function treeNodeIds(
+  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
+): Set<string> {
+  return treeNodes(doc, prerequisiteEdges(doc))
+}
 
-/** Every problem in the document's prerequisite structure (P4-0: cycles only). */
+function treeNodes(doc: Pick<GraphDocument, 'nodes'>, edges: readonly GraphEdge[]): Set<string> {
+  const typeOf = new Map(doc.nodes.map((n) => [n.id, n.typeId]))
+  const treeTypes = new Set<string>()
+  for (const e of edges) {
+    treeTypes.add(typeOf.get(e.source)!)
+    treeTypes.add(typeOf.get(e.target)!)
+  }
+  return new Set(doc.nodes.filter((n) => treeTypes.has(n.typeId)).map((n) => n.id))
+}
+
+/** A structural problem in the tech tree, shown in the Problems panel. */
+export type TreeProblem =
+  | ({ kind: 'cycle' } & PrerequisiteCycle)
+  | {
+      /** Not in a cycle, but a prerequisite (directly or further back) is: never unlockable. */
+      kind: 'blocked'
+      /** The one blocked node. */
+      nodeIds: [string]
+      /** Its direct prerequisites that are in a cycle or blocked themselves, in edge order. */
+      blockedBy: string[]
+    }
+  | {
+      /** A node of a tree type (D3) with no prerequisite edges at all. */
+      kind: 'orphan'
+      nodeIds: [string]
+    }
+
+/**
+ * Every problem in the document's prerequisite structure: cycles, then nodes that can never be
+ * unlocked, then orphans, each in document order.
+ */
 export function findProblems(
   doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
 ): TreeProblem[] {
-  return findCycles(doc).map((c) => ({ kind: 'cycle', ...c }))
+  const edges = prerequisiteEdges(doc)
+  const cycles = findCycles(doc)
+  const inCycle = new Set(cycles.flatMap((c) => c.nodeIds))
+
+  // Everything reachable from a cycle along prerequisite edges is blocked (breadth-first).
+  const out = outgoing(edges)
+  const blocked = new Set<string>()
+  const queue = [...inCycle]
+  for (let head = 0; head < queue.length; head++) {
+    for (const e of out.get(queue[head]!) ?? []) {
+      if (inCycle.has(e.target) || blocked.has(e.target)) continue
+      blocked.add(e.target)
+      queue.push(e.target)
+    }
+  }
+  const blockers = new Map<string, string[]>()
+  for (const e of edges) {
+    if (!blocked.has(e.target) || !(inCycle.has(e.source) || blocked.has(e.source))) continue
+    const list = blockers.get(e.target)
+    if (!list) blockers.set(e.target, [e.source])
+    else if (!list.includes(e.source)) list.push(e.source)
+  }
+
+  const linked = new Set(edges.flatMap((e) => [e.source, e.target]))
+  const tree = treeNodes(doc, edges)
+  const problems: TreeProblem[] = cycles.map((c) => ({ kind: 'cycle', ...c }))
+  for (const n of doc.nodes) {
+    if (blocked.has(n.id)) {
+      problems.push({ kind: 'blocked', nodeIds: [n.id], blockedBy: blockers.get(n.id)! })
+    }
+  }
+  for (const n of doc.nodes) {
+    if (tree.has(n.id) && !linked.has(n.id)) problems.push({ kind: 'orphan', nodeIds: [n.id] })
+  }
+  return problems
 }

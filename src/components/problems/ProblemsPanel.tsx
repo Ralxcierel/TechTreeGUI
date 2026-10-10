@@ -38,7 +38,7 @@ export function ProblemsPanel() {
         ) : (
           <ul className="problems__list">
             {problems.map((p, i) => (
-              <li key={p.nodeIds[0]}>
+              <li key={`${p.kind}:${p.nodeIds[0]}`}>
                 <button type="button" className="problems__item" onClick={() => show(p)}>
                   <span aria-hidden="true">⚠ </span>
                   {texts[i]}

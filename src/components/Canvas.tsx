@@ -7,7 +7,7 @@ import {
   ReactFlow,
 } from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
-import { useEditorStore } from '../editor/store'
+import { selectCycleEdgeIds, useEditorStore } from '../editor/store'
 import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
@@ -23,6 +23,7 @@ export function Canvas() {
   const docEdges = useEditorStore((s) => s.doc.edges)
   const edgeTypeList = useEditorStore((s) => s.doc.edgeTypes)
   const selectedEdgeIds = useEditorStore((s) => s.ui.selectedEdgeIds)
+  const cycleEdgeIds = useEditorStore(selectCycleEdgeIds)
   const nodeTypeList = useEditorStore((s) => s.doc.nodeTypes)
   const onNodesChange = useEditorStore((s) => s.onNodesChange)
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange)
@@ -42,8 +43,8 @@ export function Canvas() {
     [nodeTypesKey, nodeTypeList],
   )
   const edges = useMemo(
-    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds, named),
-    [docEdges, edgeTypeList, selectedEdgeIds, named],
+    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds),
+    [docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds],
   )
   const miniMapColor = useCallback(
     (node: FlowNode) => {

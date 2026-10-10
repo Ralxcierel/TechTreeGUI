@@ -189,14 +189,16 @@ let problemsCache: {
   edges: GraphDocument['edges']
   edgeTypes: GraphDocument['edgeTypes']
   nodeIds: readonly string[]
+  nodeTypeIds: readonly string[]
   problems: readonly TreeProblem[]
   cycleNodeIds: ReadonlySet<string>
+  cycleEdgeIds: ReadonlySet<string>
 } | null = null
 
 /**
  * The tech-tree problems of the open document (Phase 4), recomputed only when the edges, the edge
- * types or the list of node ids change: dragging a node keeps the same result object, so the
- * Problems panel and the cards don't re-render.
+ * types or the list of node ids and their types change: dragging or editing a node keeps the same
+ * result object, so the Problems panel, the cards and the edges don't re-render.
  */
 function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
   const c = problemsCache
@@ -207,20 +209,22 @@ function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
     c.edges === doc.edges &&
     c.edgeTypes === doc.edgeTypes &&
     c.nodeIds.length === doc.nodes.length &&
-    doc.nodes.every((n, i) => n.id === c.nodeIds[i])
+    doc.nodes.every((n, i) => n.id === c.nodeIds[i] && n.typeId === c.nodeTypeIds[i])
   ) {
     problemsCache = { ...c, doc }
     return problemsCache
   }
   const problems = findProblems(doc)
-  const cycleNodeIds = new Set(problems.filter((p) => p.kind === 'cycle').flatMap((p) => p.nodeIds))
+  const cycles = problems.filter((p) => p.kind === 'cycle')
   problemsCache = {
     doc,
     edges: doc.edges,
     edgeTypes: doc.edgeTypes,
     nodeIds: doc.nodes.map((n) => n.id),
+    nodeTypeIds: doc.nodes.map((n) => n.typeId),
     problems,
-    cycleNodeIds,
+    cycleNodeIds: new Set(cycles.flatMap((p) => p.nodeIds)),
+    cycleEdgeIds: new Set(cycles.flatMap((p) => p.edgeIds)),
   }
   return problemsCache
 }
@@ -233,6 +237,11 @@ export function selectProblems(s: Pick<EditorState, 'doc'>): readonly TreeProble
 /** Nodes that are part of a prerequisite cycle (memoised with `selectProblems`). */
 export function selectCycleNodeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<string> {
   return problemsOf(s.doc).cycleNodeIds
+}
+
+/** Prerequisite edges between nodes of one cycle (memoised with `selectProblems`). */
+export function selectCycleEdgeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<string> {
+  return problemsOf(s.doc).cycleEdgeIds
 }
 
 /** Forgets deleted nodes' open sections. */

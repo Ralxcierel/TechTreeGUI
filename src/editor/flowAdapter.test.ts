@@ -13,6 +13,7 @@ import {
   paneCenter,
   reduceEdgeChanges,
   reduceNodeChanges,
+  CYCLE_EDGE_COLOR,
   SELECTED_EDGE_COLOR,
   SIDE_HANDLE_IDS,
   toFlowEdges,
@@ -255,6 +256,15 @@ describe('toFlowEdges', () => {
     const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set())
     expect(edge?.style?.stroke).toBe('#94a3b8')
     expect(edge?.markerEnd).toEqual({ type: MarkerType.ArrowClosed, color: '#94a3b8' })
+  })
+
+  it('draws edges in a prerequisite cycle in the error colour, unless selected', () => {
+    const cycle = new Set(['ab'])
+    const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set(), new Map(), cycle)
+    expect(edge?.style?.stroke).toBe(CYCLE_EDGE_COLOR)
+    expect(edge?.markerEnd).toEqual({ type: MarkerType.ArrowClosed, color: CYCLE_EDGE_COLOR })
+    const [selected] = toFlowEdges(edges, [defaultEdgeType()], new Set(['ab']), new Map(), cycle)
+    expect(selected?.style?.stroke).toBe(SELECTED_EDGE_COLOR)
   })
 
   it('maps dash and arrow placement', () => {
