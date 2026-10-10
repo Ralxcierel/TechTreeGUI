@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { FlowNode } from '../../editor/flowAdapter'
 import { useEditorStore } from '../../editor/store'
-import type { NodeStyle } from '../../model'
+import { addNode, connect, createEmptyDocument, type NodeStyle } from '../../model'
 import { GraphNode } from './GraphNode'
 
 const store = useEditorStore
@@ -141,5 +141,41 @@ describe('GraphNode', () => {
   it('says so when the node type is unknown', () => {
     renderNode('gone', {})
     expect(screen.getByText('Unknown type')).toBeTruthy()
+  })
+})
+
+describe('GraphNode: prerequisite cycles', () => {
+  /** Loads a document with nodes n1 and n2, linked n1 → n2 and (if `loop`) back. */
+  function loadPair(loop: boolean) {
+    let doc = addNode(
+      addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'),
+      'technology',
+      { x: 0, y: 0 },
+      'n2',
+    )
+    const links = loop
+      ? [
+          ['n1', 'n2'],
+          ['n2', 'n1'],
+        ]
+      : [['n1', 'n2']]
+    for (const [source, target] of links) {
+      const result = connect(doc, { source: source!, target: target!, typeId: 'prereq' })
+      if (!result.ok) throw new Error(result.error)
+      doc = result.doc
+    }
+    store.getState().loadDocument(doc)
+  }
+
+  it('leaves nodes outside a cycle unmarked', () => {
+    loadPair(false)
+    expect(renderNode('technology', { title: 'Fire' }).className).not.toContain('graph-node--cycle')
+    expect(screen.queryByText(/prerequisite cycle/)).toBeNull()
+  })
+
+  it('marks a node that is part of a cycle, also for screen readers', () => {
+    loadPair(true)
+    expect(renderNode('technology', { title: 'Fire' }).className).toContain('graph-node--cycle')
+    expect(screen.getByText(/In a prerequisite cycle/).className).toBe('visually-hidden')
   })
 })

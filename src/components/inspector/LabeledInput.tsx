@@ -6,9 +6,17 @@ interface LabeledInputProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** Id of an element that describes the input (e.g. a hint below it). */
+  describedBy?: string
 }
 
-export function LabeledInput({ label, value, onChange, placeholder }: LabeledInputProps) {
+export function LabeledInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  describedBy,
+}: LabeledInputProps) {
   // useId gives a unique id per instance, linking the <label> to its <input>.
   const id = useId()
   return (
@@ -21,6 +29,7 @@ export function LabeledInput({ label, value, onChange, placeholder }: LabeledInp
         type="text"
         value={value}
         placeholder={placeholder}
+        aria-describedby={describedBy}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>

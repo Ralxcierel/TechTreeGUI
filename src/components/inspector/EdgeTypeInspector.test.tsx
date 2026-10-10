@@ -38,6 +38,13 @@ describe('EdgeTypeInspector', () => {
     expect(s().doc.edgeTypes[1]!.semantics).toBeNull()
   })
 
+  it('explains the "prerequisite" meaning in a hint linked to the Meaning box', () => {
+    render(<EdgeTypeInspector typeId="unlocks" />)
+    const meaning = screen.getByLabelText('Meaning (optional)')
+    const hint = document.getElementById(meaning.getAttribute('aria-describedby') ?? '')
+    expect(hint?.textContent).toMatch(/"prerequisite" makes these edges count/)
+  })
+
   it('edits colour, width, arrowhead and line shape', () => {
     render(<EdgeTypeInspector typeId="unlocks" />)
     const colour = screen.getByLabelText('Colour')

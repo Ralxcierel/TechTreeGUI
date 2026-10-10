@@ -15,6 +15,7 @@ import {
   createNodeType,
   deleteEdgeType,
   deleteNodeType,
+  findProblems,
   moveField,
   moveHandle,
   orientEnds,
@@ -41,6 +42,7 @@ import {
   type NodeTypePatch,
   type TypeOpResult,
   type GraphDocument,
+  type TreeProblem,
   type NodeStyle,
   type Position,
   type Viewport,
@@ -96,6 +98,8 @@ interface EditorState {
   updateEdgeType: (typeId: string, patch: EdgeTypePatch) => void
   /** Deletes an edge type. Returns why not (e.g. edges still use it), or null when it worked. */
   deleteEdgeType: (typeId: string) => string | null
+  /** Selects exactly these nodes (nothing else), e.g. from the Problems panel. */
+  selectNodes: (nodeIds: readonly string[]) => void
   /** Opens or closes a node's expanded section. */
   toggleExpanded: (nodeId: string) => void
   /** Picks the node type "Add node" uses. */
@@ -177,6 +181,58 @@ export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'
     return s.activeNodeTypeId
   }
   return types[0]?.id ?? null
+}
+
+/** Cached inputs and result of `selectProblems`. */
+let problemsCache: {
+  doc: GraphDocument
+  edges: GraphDocument['edges']
+  edgeTypes: GraphDocument['edgeTypes']
+  nodeIds: readonly string[]
+  problems: readonly TreeProblem[]
+  cycleNodeIds: ReadonlySet<string>
+} | null = null
+
+/**
+ * The tech-tree problems of the open document (Phase 4), recomputed only when the edges, the edge
+ * types or the list of node ids change: dragging a node keeps the same result object, so the
+ * Problems panel and the cards don't re-render.
+ */
+function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
+  const c = problemsCache
+  // Every card runs this on every store update, so the same document must be a cheap hit.
+  if (c && c.doc === doc) return c
+  if (
+    c &&
+    c.edges === doc.edges &&
+    c.edgeTypes === doc.edgeTypes &&
+    c.nodeIds.length === doc.nodes.length &&
+    doc.nodes.every((n, i) => n.id === c.nodeIds[i])
+  ) {
+    problemsCache = { ...c, doc }
+    return problemsCache
+  }
+  const problems = findProblems(doc)
+  const cycleNodeIds = new Set(problems.filter((p) => p.kind === 'cycle').flatMap((p) => p.nodeIds))
+  problemsCache = {
+    doc,
+    edges: doc.edges,
+    edgeTypes: doc.edgeTypes,
+    nodeIds: doc.nodes.map((n) => n.id),
+    problems,
+    cycleNodeIds,
+  }
+  return problemsCache
+}
+
+/** Every tech-tree problem in the document (memoised; see `problemsOf`). */
+export function selectProblems(s: Pick<EditorState, 'doc'>): readonly TreeProblem[] {
+  return problemsOf(s.doc).problems
+}
+
+/** Nodes that are part of a prerequisite cycle (memoised with `selectProblems`). */
+export function selectCycleNodeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<string> {
+  return problemsOf(s.doc).cycleNodeIds
 }
 
 /** Forgets deleted nodes' open sections. */
@@ -295,6 +351,16 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       }))
       return null
     },
+    selectNodes: (nodeIds) =>
+      set((s) => {
+        const known = new Set(s.doc.nodes.map((n) => n.id))
+        const ui = {
+          ...s.ui,
+          selectedNodeIds: new Set(nodeIds.filter((id) => known.has(id))),
+          selectedEdgeIds: new Set<string>(),
+        }
+        return { ...derive(s, s.doc, ui), editing: null }
+      }),
     toggleExpanded: (nodeId) =>
       set((s) => {
         const next = new Set(s.expandedNodeIds)

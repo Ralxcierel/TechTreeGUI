@@ -10,7 +10,7 @@ import {
 } from '@xyflow/react'
 import { useEffect, useId, useState } from 'react'
 import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
-import { useEditorStore } from '../../editor/store'
+import { selectCycleNodeIds, useEditorStore } from '../../editor/store'
 import { sideHandleIds, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle } from '../../model'
 import { cardIcon } from '../../editor/images'
@@ -40,6 +40,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const removeNodeField = useEditorStore((s) => s.removeNodeField)
   const expanded = useEditorStore((s) => s.expandedNodeIds.has(id))
   const toggleExpanded = useEditorStore((s) => s.toggleExpanded)
+  const inCycle = useEditorStore((s) => selectCycleNodeIds(s).has(id))
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -85,7 +86,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
 
   return (
     <div
-      className={`graph-node graph-node--${shape}`}
+      className={`graph-node graph-node--${shape}${inCycle ? ' graph-node--cycle' : ''}`}
       {...pointer}
       aria-describedby={tooltipShown ? tooltipId : undefined}
       style={{
@@ -117,6 +118,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
         <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
       ))}
       <div className="graph-node__body">
+        {inCycle && <span className="visually-hidden">In a prerequisite cycle. </span>}
         {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
           const commit = (value: string) => setNodeField(id, line.key, value)

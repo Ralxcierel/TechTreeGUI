@@ -6,6 +6,7 @@
   --text-muted: #94a3b8;
   --accent: #38bdf8;
   --error: #f87171;
+  --warning: #fbbf24;
   --radius: 8px;
 
   color-scheme: dark;
@@ -257,6 +258,13 @@ body,
 
 .graph-node--circle .graph-node__line {
   margin-top: 2px;
+}
+
+/* Nodes in a prerequisite cycle (Phase 4): a dashed warning outline just outside the card, so
+   it shows next to the selection outline and follows the card's shape. */
+.graph-node--cycle {
+  outline: 2px dashed var(--warning);
+  outline-offset: 4px;
 }
 
 .graph-node--missing {
@@ -769,4 +777,56 @@ body,
 .card-expanded__toggle,
 .card-expanded {
   clear: left;
+}
+
+/* The Problems panel, below the Library (Phase 4). */
+.problems__summary {
+  cursor: pointer;
+  list-style-position: outside;
+  margin-left: 14px;
+}
+
+.problems__heading {
+  display: inline;
+}
+
+.problems__count {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.problems__list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problems__item {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.problems__item:hover {
+  background: var(--panel-border);
+}
+
+.problems__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
