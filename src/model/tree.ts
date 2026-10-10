@@ -254,3 +254,86 @@ export function findProblems(
   }
   return problems
 }
+
+/**
+ * A node's state in play mode (decision D7 of Phase 4): `outside` = not part of the tree (D3),
+ * `blocked` = in or behind a cycle, `available` = every prerequisite unlocked (roots start
+ * available), `locked` = waiting for a prerequisite, `unlocked` = picked by the player.
+ */
+export type PlayState = 'outside' | 'blocked' | 'locked' | 'available' | 'unlocked'
+
+/**
+ * Every node's play state, given the nodes the player has unlocked (prerequisites are AND, D4).
+ * `problems` may be passed when already known (it must be `findProblems(doc)`).
+ */
+export function playStates(
+  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
+  unlocked: ReadonlySet<string>,
+  problems: readonly TreeProblem[] = findProblems(doc),
+): Map<string, PlayState> {
+  const edges = prerequisiteEdges(doc)
+  const tree = treeNodes(doc, edges)
+  const stuck = new Set(problems.filter((p) => p.kind !== 'orphan').flatMap((p) => p.nodeIds))
+  const prerequisites = new Map<string, string[]>()
+  for (const e of edges) {
+    const list = prerequisites.get(e.target)
+    if (list) list.push(e.source)
+    else prerequisites.set(e.target, [e.source])
+  }
+  const states = new Map<string, PlayState>()
+  for (const n of doc.nodes) {
+    let state: PlayState
+    if (!tree.has(n.id)) state = 'outside'
+    else if (stuck.has(n.id)) state = 'blocked'
+    else if (unlocked.has(n.id)) state = 'unlocked'
+    else if ((prerequisites.get(n.id) ?? []).every((id) => unlocked.has(id))) state = 'available'
+    else state = 'locked'
+    states.set(n.id, state)
+  }
+  return states
+}
+
+/**
+ * The unlocked set after the player clicks a node: an available node is unlocked; an unlocked node
+ * is locked again, together with every unlocked node that depends on it (directly or further
+ * down). Any other node leaves the set unchanged (the same object is returned). `states` may be
+ * passed when already known (it must be `playStates(doc, unlocked)`).
+ */
+export function toggleUnlocked(
+  doc: Pick<GraphDocument, 'edges' | 'edgeTypes' | 'nodes'>,
+  unlocked: ReadonlySet<string>,
+  nodeId: string,
+  states: ReadonlyMap<string, PlayState> = playStates(doc, unlocked),
+): ReadonlySet<string> {
+  const state = states.get(nodeId)
+  if (state === 'available') return new Set([...unlocked, nodeId])
+  if (state !== 'unlocked') return unlocked
+  const out = outgoing(prerequisiteEdges(doc))
+  const next = new Set(unlocked)
+  const queue = [nodeId]
+  next.delete(nodeId)
+  for (let head = 0; head < queue.length; head++) {
+    for (const e of out.get(queue[head]!) ?? []) {
+      if (next.delete(e.target)) queue.push(e.target)
+    }
+  }
+  return next
+}
+
+/** The field key whose number is a node's cost in play mode (decision D6 of Phase 4). */
+export const COST_KEY = 'cost'
+
+/**
+ * A node's cost: the value of its type's number field keyed `cost`. Nodes whose type has no such
+ * field, or whose value isn't a finite number, cost 0.
+ */
+export function nodeCost(
+  doc: Pick<GraphDocument, 'nodeTypes'>,
+  node: Pick<GraphDocument['nodes'][number], 'typeId' | 'data'>,
+): number {
+  const type = doc.nodeTypes.find((t) => t.id === node.typeId)
+  const field = type?.fields.find((f) => f.key === COST_KEY)
+  if (field?.kind !== 'number' || !Object.hasOwn(node.data, COST_KEY)) return 0
+  const value = node.data[COST_KEY]
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}

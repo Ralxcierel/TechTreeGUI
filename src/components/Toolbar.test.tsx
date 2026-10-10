@@ -35,3 +35,16 @@ describe('Toolbar: Add node', () => {
     expect(screen.getByText(/no node types/)).toBeTruthy()
   })
 })
+
+describe('Toolbar: play mode', () => {
+  it('disables Add node while playing', () => {
+    renderToolbar()
+    const add = screen.getByRole('button', { name: 'Add node' })
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(add.matches(':disabled')).toBe(true)
+    fireEvent.click(add)
+    expect(s().doc.nodes).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: 'Stop playing' }))
+    expect(add.matches(':disabled')).toBe(false)
+  })
+})

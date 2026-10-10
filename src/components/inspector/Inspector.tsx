@@ -14,6 +14,7 @@ function plural(n: number, word: string): string {
 export function Inspector() {
   const selectedNodeIds = useEditorStore((s) => s.ui.selectedNodeIds)
   const selectedEdgeIds = useEditorStore((s) => s.ui.selectedEdgeIds)
+  const playing = useEditorStore((s) => s.playing)
   // Only while the type still exists, so deleting or a load never leaves an empty panel.
   const editingEdgeType = useEditorStore((s) =>
     s.editing?.kind === 'edgeType' && s.doc.edgeTypes.some((t) => t.id === s.editing?.id)
@@ -49,7 +50,12 @@ export function Inspector() {
 
   return (
     <aside className="inspector" aria-label="Inspector">
-      {content}
+      {playing && <p className="inspector__note">Play mode: editing is off.</p>}
+      {/* In play mode (D7) the inspector still shows what is clicked, but read-only: a disabled
+          fieldset disables every control inside it. */}
+      <fieldset className="plain-fieldset" role="presentation" disabled={playing}>
+        {content}
+      </fieldset>
     </aside>
   )
 }

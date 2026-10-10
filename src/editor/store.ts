@@ -16,6 +16,8 @@ import {
   deleteEdgeType,
   deleteNodeType,
   findProblems,
+  playStates,
+  toggleUnlocked,
   moveField,
   moveHandle,
   orientEnds,
@@ -43,6 +45,7 @@ import {
   type TypeOpResult,
   type GraphDocument,
   type TreeProblem,
+  type PlayState,
   type NodeStyle,
   type Position,
   type Viewport,
@@ -82,6 +85,14 @@ interface EditorState {
   expandedNodeIds: ReadonlySet<string>
   /** The type shown in the inspector, or null to show the canvas selection. */
   editing: Editing | null
+  /** Play mode (D7 of Phase 4, editor-only): the document is read-only and nodes can be unlocked. */
+  playing: boolean
+  /** Nodes the player has unlocked (editor-only, never saved; cleared when play mode ends). */
+  unlockedIds: ReadonlySet<string>
+  /** Turns play mode on or off; either way the unlocked set starts empty. */
+  setPlaying: (playing: boolean) => void
+  /** In play mode: unlocks an available node, or re-locks an unlocked one and what depends on it. */
+  togglePlayUnlock: (nodeId: string) => void
   addNode: (typeId: string, position: Position) => void
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
@@ -244,6 +255,28 @@ export function selectCycleEdgeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<str
   return problemsOf(s.doc).cycleEdgeIds
 }
 
+/** Cached inputs and result of `selectPlayStates`. */
+let playCache: {
+  problems: readonly TreeProblem[]
+  unlocked: ReadonlySet<string>
+  states: ReadonlyMap<string, PlayState>
+} | null = null
+
+/**
+ * Every node's play state (memoised): recomputed only when the unlocked set or the tree's
+ * structure changes (`selectProblems` keeps its result object while the structure is the same).
+ */
+export function selectPlayStates(
+  s: Pick<EditorState, 'doc' | 'unlockedIds'>,
+): ReadonlyMap<string, PlayState> {
+  const problems = selectProblems(s)
+  const c = playCache
+  if (c && c.problems === problems && c.unlocked === s.unlockedIds) return c.states
+  const states = playStates(s.doc, s.unlockedIds, problems)
+  playCache = { problems, unlocked: s.unlockedIds, states }
+  return states
+}
+
 /** Forgets deleted nodes' open sections. */
 function pruneExpanded(
   expanded: ReadonlySet<string>,
@@ -256,6 +289,15 @@ function pruneExpanded(
   const ids = new Set(after.nodes.map((n) => n.id))
   const kept = [...expanded].filter((id) => ids.has(id))
   return kept.length === expanded.size ? {} : { expandedNodeIds: new Set(kept) }
+}
+
+/**
+ * In play mode the document is read-only (D7): only selection and size measurements of React
+ * Flow's change events get through, never moves or deletions. (A backstop: the canvas already
+ * turns dragging and the Delete key off.)
+ */
+function playSafe<C extends NodeChange | EdgeChange>(playing: boolean, changes: C[]): C[] {
+  return playing ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions') : changes
 }
 
 /** Selecting something on the canvas closes a type opened from the Library. */
@@ -311,10 +353,19 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     activeNodeTypeId: null,
     expandedNodeIds: new Set(),
     editing: null,
+    playing: false,
+    unlockedIds: new Set(),
+    setPlaying: (playing) => set({ playing, unlockedIds: new Set() }),
+    togglePlayUnlock: (nodeId) =>
+      set((s) =>
+        s.playing
+          ? { unlockedIds: toggleUnlocked(s.doc, s.unlockedIds, nodeId, selectPlayStates(s)) }
+          : s,
+      ),
     addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
     onNodesChange: (changes) =>
       set((s) => {
-        const next = reduceNodeChanges(s.doc, s.ui, changes)
+        const next = reduceNodeChanges(s.doc, s.ui, playSafe(s.playing, changes))
         return {
           ...derive(s, next.doc, next.ui),
           ...closeEditingOnSelect(s.editing, next.ui),
@@ -323,7 +374,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       }),
     onEdgesChange: (changes) =>
       set((s) => {
-        const next = reduceEdgeChanges(s.doc, s.ui, changes)
+        const next = reduceEdgeChanges(s.doc, s.ui, playSafe(s.playing, changes))
         return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
       }),
     isValidConnection: (connection) => {
@@ -334,7 +385,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     connect: (connection) =>
       set((s) => {
         const typeId = activeEdgeTypeId(s)
-        if (typeId === null) return s
+        if (typeId === null || s.playing) return s
         const result = connect(s.doc, toEnds(s.doc, connection, typeId))
         return result.ok ? derive(s, result.doc, s.ui) : s
       }),
@@ -452,6 +503,8 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           activeNodeTypeId: null,
           expandedNodeIds: new Set(),
           editing: null,
+          playing: false,
+          unlockedIds: new Set(),
         }
       }),
     newDocument: () => get().loadDocument(createEmptyDocument()),

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
 import { createEdgeType, updateEdgeType } from './edgeTypes'
-import { addNode, connect } from './operations'
+import { addNode, connect, updateNodeData } from './operations'
 import {
   findCycles,
   findProblems,
   isPrerequisiteType,
+  nodeCost,
+  playStates,
   prerequisiteEdges,
+  toggleUnlocked,
   treeNodeIds,
 } from './tree'
 import type { EdgeType, GraphDocument } from './types'
@@ -221,5 +224,107 @@ describe('findProblems', () => {
     expect(findProblems(doc)).toEqual([])
     doc = withEdges(doc, ['a>b'], 'prereq')
     expect(findProblems(doc)).toEqual([{ kind: 'orphan', nodeIds: ['c'] }])
+  })
+})
+
+describe('playStates', () => {
+  // fire → smelting → bronze, and wheel → bronze (bronze needs both); writing has no links.
+  const tree = () =>
+    graph(
+      ['fire', 'smelting', 'wheel', 'bronze', 'writing'],
+      ['fire>smelting', 'smelting>bronze', 'wheel>bronze'],
+    )
+  const states = (doc: GraphDocument, unlocked: string[]) =>
+    Object.fromEntries(playStates(doc, new Set(unlocked)))
+
+  it('starts with the roots available and everything else locked', () => {
+    expect(states(tree(), [])).toEqual({
+      fire: 'available',
+      smelting: 'locked',
+      wheel: 'available',
+      bronze: 'locked',
+      writing: 'available', // an orphan has no prerequisites, so it is a root
+    })
+  })
+
+  it('makes a node available only when all its prerequisites are unlocked', () => {
+    expect(states(tree(), ['fire', 'smelting'])).toMatchObject({
+      smelting: 'unlocked',
+      bronze: 'locked',
+    })
+    expect(states(tree(), ['fire', 'smelting', 'wheel'])).toMatchObject({ bronze: 'available' })
+  })
+
+  it('shows nodes in or behind a cycle as blocked, and nodes outside the tree as outside', () => {
+    let doc = graph(['a', 'b', 'c', 'root'], ['a>b', 'b>a', 'b>c'])
+    doc = addNode(doc, 'note', { x: 0, y: 0 }, 'memo')
+    expect(states(doc, [])).toEqual({
+      a: 'blocked',
+      b: 'blocked',
+      c: 'blocked',
+      root: 'available',
+      memo: 'outside',
+    })
+  })
+
+  it('marks nothing as part of the tree without prerequisite edges', () => {
+    expect(states(graph(['a', 'b'], []), [])).toEqual({ a: 'outside', b: 'outside' })
+  })
+})
+
+describe('toggleUnlocked', () => {
+  const tree = () => graph(['a', 'b', 'c', 'd', 'x'], ['a>b', 'b>c', 'a>d', 'x>c'])
+
+  it('unlocks an available node', () => {
+    expect([...toggleUnlocked(tree(), new Set(), 'a')]).toEqual(['a'])
+    expect([...toggleUnlocked(tree(), new Set(['a']), 'b')]).toEqual(['a', 'b'])
+  })
+
+  it('leaves locked, blocked and outside nodes alone (same set)', () => {
+    const unlocked = new Set(['a'])
+    expect(toggleUnlocked(tree(), unlocked, 'c')).toBe(unlocked)
+    const cyclic = graph(['p', 'q'], ['p>q', 'q>p'])
+    expect(toggleUnlocked(cyclic, unlocked, 'p')).toBe(unlocked)
+    const noted = addNode(tree(), 'note', { x: 0, y: 0 }, 'memo')
+    expect(toggleUnlocked(noted, unlocked, 'memo')).toBe(unlocked)
+    expect(toggleUnlocked(tree(), unlocked, 'missing')).toBe(unlocked)
+  })
+
+  it('re-locks an unlocked node and everything unlocked that depends on it', () => {
+    const all = new Set(['a', 'b', 'x', 'c', 'd'])
+    expect([...toggleUnlocked(tree(), all, 'b')].sort()).toEqual(['a', 'd', 'x'])
+    expect([...toggleUnlocked(tree(), all, 'a')].sort()).toEqual(['x'])
+    expect([...toggleUnlocked(tree(), all, 'c')].sort()).toEqual(['a', 'b', 'd', 'x'])
+  })
+})
+
+describe('nodeCost', () => {
+  const withCost = (kind: 'number' | 'text'): GraphDocument => {
+    const doc = graph(['a'], [])
+    const cost = { key: 'cost', label: 'Cost', kind, show: ['tooltip' as const] }
+    return {
+      ...doc,
+      nodeTypes: doc.nodeTypes.map((t) =>
+        t.id === 'technology' ? { ...t, fields: [...t.fields, cost] } : t,
+      ),
+    }
+  }
+
+  it("reads the number in the type's `cost` number field", () => {
+    const doc = updateNodeData(withCost('number'), 'a', 'cost', 150)
+    expect(nodeCost(doc, doc.nodes[0]!)).toBe(150)
+  })
+
+  it('counts 0 without a cost field, without a value, or for a value that is not a number', () => {
+    const plain = updateNodeData(graph(['a'], []), 'a', 'cost', 150)
+    expect(nodeCost(plain, plain.nodes[0]!)).toBe(0) // type has no cost field
+    const empty = withCost('number')
+    expect(nodeCost(empty, empty.nodes[0]!)).toBe(0)
+    const text = updateNodeData(withCost('number'), 'a', 'cost', '150')
+    expect(nodeCost(text, text.nodes[0]!)).toBe(0)
+    const textField = updateNodeData(withCost('text'), 'a', 'cost', 150)
+    expect(nodeCost(textField, textField.nodes[0]!)).toBe(0)
+    const nan = updateNodeData(withCost('number'), 'a', 'cost', Number.NaN)
+    expect(nodeCost(nan, nan.nodes[0]!)).toBe(0)
   })
 })

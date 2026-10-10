@@ -6,7 +6,7 @@ import {
   MiniMap,
   ReactFlow,
 } from '@xyflow/react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { selectCycleEdgeIds, useEditorStore } from '../editor/store'
 import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
@@ -29,6 +29,8 @@ export function Canvas() {
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange)
   const onConnect = useEditorStore((s) => s.connect)
   const isValidConnection = useEditorStore((s) => s.isValidConnection)
+  const playing = useEditorStore((s) => s.playing)
+  const togglePlayUnlock = useEditorStore((s) => s.togglePlayUnlock)
   // Read once: the canvas starts at the document's saved viewport; later loads set it explicitly.
   // The live viewport is copied back into the document only on Save (see Toolbar).
   const [initialViewport] = useState(() => useEditorStore.getState().doc.view.viewport)
@@ -57,8 +59,28 @@ export function Canvas() {
   // While a connection is being dragged, every node shows its handles (CSS `.canvas--connecting`).
   const [connecting, setConnecting] = useState(false)
 
+  // Play mode: a click unlocks or re-locks a node. The second click of a double-click is ignored,
+  // so a double-click doesn't undo the first click (which may have re-locked dependent nodes too).
+  const onPlayClick = (e: MouseEvent, node: FlowNode) => {
+    if (e.detail <= 1) togglePlayUnlock(node.id)
+  }
+  // React Flow's own Enter/Space on a focused node only selects it; in play mode they also unlock
+  // or re-lock it, so the keyboard can do what a click does. Only for the node itself, not for a
+  // control inside it (e.g. the expanded-section toggle).
+  const onPlayKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!playing || e.repeat || (e.key !== 'Enter' && e.key !== ' ')) return
+    const target = e.target as HTMLElement
+    if (!target.classList.contains('react-flow__node') || !target.dataset.id) return
+    e.preventDefault()
+    togglePlayUnlock(target.dataset.id)
+  }
+
+  const className = ['canvas', connecting && 'canvas--connecting', playing && 'canvas--play']
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={connecting ? 'canvas canvas--connecting' : 'canvas'}>
+    <div className={className} onKeyDown={onPlayKeyDown}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -71,12 +93,22 @@ export function Canvas() {
         onConnectStart={() => setConnecting(true)}
         onConnectEnd={() => setConnecting(false)}
         isValidConnection={isValidConnection}
-        deleteKeyCode={deleteKeys}
+        // Play mode (D7): pan, zoom and select still work; nothing can be moved, connected or
+        // deleted, and clicking a node unlocks or re-locks it.
+        nodesDraggable={!playing}
+        nodesConnectable={!playing}
+        onNodeClick={playing ? onPlayClick : undefined}
+        zoomOnDoubleClick={!playing}
+        // No box selection in play: its overlay sits on the selected nodes and swallows clicks.
+        selectionKeyCode={playing ? null : 'Shift'}
+        deleteKeyCode={playing ? null : deleteKeys}
         defaultViewport={initialViewport}
         colorMode="dark"
       >
         <Background variant={BackgroundVariant.Dots} gap={20} />
-        <Controls />
+        {/* No lock button while playing: it writes straight into React Flow's own settings and
+            could turn dragging back on. */}
+        <Controls showInteractive={!playing} />
         <MiniMap nodeColor={miniMapColor} pannable zoomable />
       </ReactFlow>
     </div>

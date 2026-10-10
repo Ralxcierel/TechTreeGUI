@@ -65,6 +65,23 @@ body,
   border-color: var(--accent);
 }
 
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--panel-border);
+}
+
+/* Play mode (Phase 4): the toggle sits apart from the file buttons. */
+.toolbar .toolbar__play {
+  margin-left: 12px;
+  border-color: var(--accent);
+}
+
+.toolbar__play-status {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .error-banner {
   display: flex;
   align-items: flex-start;
@@ -562,7 +579,8 @@ body,
   cursor: not-allowed;
 }
 
-.library__section + .library__section {
+.library__section + .library__section,
+.plain-fieldset + .library__section {
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid var(--panel-border);
@@ -829,4 +847,85 @@ body,
 .problems__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* A fieldset used only to disable everything inside it (play mode), drawn as nothing. */
+.plain-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Play mode (Phase 4, D7): node states. Handles are hidden: nothing can be connected. */
+.canvas--play .react-flow__handle {
+  visibility: hidden;
+}
+
+/* Only nodes a click changes get the hand cursor (React Flow gives every selectable node one). */
+.canvas--play .react-flow__node {
+  cursor: default;
+}
+
+.canvas--play .react-flow__node:has(.graph-node--play-available, .graph-node--play-unlocked) {
+  cursor: pointer;
+}
+
+.graph-node--play {
+  transition: opacity 0.15s;
+}
+
+.graph-node--play-outside {
+  opacity: 0.25;
+}
+
+.graph-node--play-locked {
+  opacity: 0.45;
+}
+
+.graph-node--play-available {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.graph-node--play-unlocked {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  box-shadow: inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.react-flow__node.selected .graph-node--play-unlocked {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.graph-node--play-blocked {
+  outline: 2px dashed var(--error);
+  outline-offset: 4px;
+  opacity: 0.6;
+}
+
+/* The check mark on an unlocked card, at its top-right corner (placed against React Flow's node
+   wrapper, which is positioned and the same size as the card). */
+.graph-node__unlocked {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+}
+
+/* On a circle, the top-right corner of the box is far from the outline: sit on the outline at
+   45 degrees instead (14.6% in from each side). */
+.graph-node--circle .graph-node__unlocked {
+  top: calc(14.6% - 11px);
+  right: calc(14.6% - 11px);
 }

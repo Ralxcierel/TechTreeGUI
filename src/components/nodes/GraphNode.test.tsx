@@ -179,3 +179,66 @@ describe('GraphNode: prerequisite cycles', () => {
     expect(screen.getByText(/In a prerequisite cycle/).className).toBe('visually-hidden')
   })
 })
+
+describe('GraphNode: play mode', () => {
+  /** Loads n1 → n2 (and a cycle p ⇄ q if asked), turns play mode on, and draws node `n1`. */
+  function playing(unlockN1 = false) {
+    let doc = createEmptyDocument()
+    for (const id of ['n1', 'n2']) doc = addNode(doc, 'technology', { x: 0, y: 0 }, id)
+    const result = connect(doc, { source: 'n1', target: 'n2', typeId: 'prereq' })
+    if (!result.ok) throw new Error(result.error)
+    store.getState().loadDocument(result.doc)
+    store.getState().setPlaying(true)
+    if (unlockN1) store.getState().togglePlayUnlock('n1')
+  }
+
+  it('shows an available root with its state, also for screen readers', () => {
+    playing()
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-available')
+    expect(screen.getByText(/Available: click or press Enter to unlock/).className).toBe(
+      'visually-hidden',
+    )
+    expect(document.querySelector('.graph-node__unlocked')).toBeNull()
+  })
+
+  it('shows an unlocked node with a check mark', () => {
+    playing(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-unlocked')
+    expect(screen.getByText(/Unlocked: click or press Enter to lock again/)).toBeTruthy()
+    expect(card.querySelector('.graph-node__unlocked')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it("can't edit the title while playing", () => {
+    playing()
+    renderNode('technology', { title: 'Fire' })
+    fireEvent.doubleClick(screen.getByText('Fire'))
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('shows play states instead of the cycle mark', () => {
+    let doc = createEmptyDocument()
+    for (const id of ['n1', 'n2']) doc = addNode(doc, 'technology', { x: 0, y: 0 }, id)
+    for (const [source, target] of [
+      ['n1', 'n2'],
+      ['n2', 'n1'],
+    ] as const) {
+      const result = connect(doc, { source, target, typeId: 'prereq' })
+      if (!result.ok) throw new Error(result.error)
+      doc = result.doc
+    }
+    store.getState().loadDocument(doc)
+    store.getState().setPlaying(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-blocked')
+    expect(card.className).not.toContain('graph-node--cycle')
+    expect(screen.queryByText(/In a prerequisite cycle/)).toBeNull()
+  })
+
+  it('shows a node outside the tree as such', () => {
+    store.getState().setPlaying(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-outside')
+  })
+})

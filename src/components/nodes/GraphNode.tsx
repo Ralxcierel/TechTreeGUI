@@ -10,9 +10,9 @@ import {
 } from '@xyflow/react'
 import { useEffect, useId, useState } from 'react'
 import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
-import { selectCycleNodeIds, useEditorStore } from '../../editor/store'
+import { selectCycleNodeIds, selectPlayStates, useEditorStore } from '../../editor/store'
 import { sideHandleIds, type FlowNode } from '../../editor/flowAdapter'
-import { knownShape, resolveNodeStyle } from '../../model'
+import { knownShape, resolveNodeStyle, type PlayState } from '../../model'
 import { cardIcon } from '../../editor/images'
 import { outlineForShape } from '../../editor/floatingEdge'
 import { CardEnumSelect } from './CardEnumSelect'
@@ -26,6 +26,15 @@ import { useHoverIntent } from './useHoverIntent'
 
 /** How long the pointer must rest on a node before its tooltip shows (decision D2 of Phase 3). */
 export const TOOLTIP_DELAY_MS = 400
+
+/** What a screen reader hears for each play state (the card shows it with colour and a mark). */
+const PLAY_STATE_TEXT: Record<PlayState, string> = {
+  outside: 'Not part of the tech tree. ',
+  blocked: 'Blocked: can never be unlocked. ',
+  locked: 'Locked. ',
+  available: 'Available: click or press Enter to unlock. ',
+  unlocked: 'Unlocked: click or press Enter to lock again. ',
+}
 
 const SIDE_POSITION: Record<string, Position> = {
   top: Position.Top,
@@ -41,6 +50,11 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const expanded = useEditorStore((s) => s.expandedNodeIds.has(id))
   const toggleExpanded = useEditorStore((s) => s.toggleExpanded)
   const inCycle = useEditorStore((s) => selectCycleNodeIds(s).has(id))
+  // In play mode (D7) the node's state; null while editing.
+  const playState = useEditorStore((s) =>
+    s.playing ? (selectPlayStates(s).get(id) ?? 'outside') : null,
+  )
+  const readOnly = playState !== null
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -86,7 +100,16 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
 
   return (
     <div
-      className={`graph-node graph-node--${shape}${inCycle ? ' graph-node--cycle' : ''}`}
+      className={[
+        'graph-node',
+        `graph-node--${shape}`,
+        // In play mode the play state replaces the cycle mark (a cycle's nodes show as blocked).
+        playState
+          ? `graph-node--play graph-node--play-${playState}`
+          : inCycle && 'graph-node--cycle',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       {...pointer}
       aria-describedby={tooltipShown ? tooltipId : undefined}
       style={{
@@ -117,13 +140,23 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
       {sideHandleIds(nodeType.handles).map((side) => (
         <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
       ))}
+      {/* Outside the body, which clips its content on circles. */}
+      {playState === 'unlocked' && (
+        <span className="graph-node__unlocked" aria-hidden="true">
+          ✓
+        </span>
+      )}
       <div className="graph-node__body">
-        {inCycle && <span className="visually-hidden">In a prerequisite cycle. </span>}
+        {playState ? (
+          <span className="visually-hidden">{PLAY_STATE_TEXT[playState]}</span>
+        ) : (
+          inCycle && <span className="visually-hidden">In a prerequisite cycle. </span>
+        )}
         {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
           const commit = (value: string) => setNodeField(id, line.key, value)
           if (line.title) {
-            return line.editable ? (
+            return line.editable && !readOnly ? (
               <EditableText
                 key={line.key}
                 className="graph-node__title"
@@ -144,7 +177,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
               <span className="graph-node__label">{line.label}: </span>
               {line.imageUrl ? (
                 <CardImage className="graph-node__image" src={line.imageUrl} alt={line.label} />
-              ) : line.choices ? (
+              ) : line.choices && !readOnly ? (
                 <CardEnumSelect
                   label={line.label}
                   choices={line.choices}
@@ -153,7 +186,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
                     v === undefined ? removeNodeField(id, line.key) : setNodeField(id, line.key, v)
                   }
                 />
-              ) : line.editable ? (
+              ) : line.editable && !readOnly ? (
                 <EditableText
                   className="graph-node__value"
                   label={line.label}

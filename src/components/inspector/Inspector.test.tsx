@@ -106,3 +106,19 @@ describe('Inspector', () => {
     expect(screen.getByRole('heading', { name: 'Document' })).toBeTruthy()
   })
 })
+
+describe('Inspector: play mode', () => {
+  it('still shows the selected node, read-only', () => {
+    const [id] = addNodes(1)
+    select([id!])
+    act(() => s().setPlaying(true))
+    render(<Inspector />)
+    expect(screen.getByText('Play mode: editing is off.')).toBeTruthy()
+    const name = screen.getByLabelText('Name') as HTMLInputElement
+    expect(name.value).toBe('New Technology')
+    expect(name.matches(':disabled')).toBe(true)
+    act(() => s().setPlaying(false))
+    expect(name.matches(':disabled')).toBe(false)
+    expect(screen.queryByText('Play mode: editing is off.')).toBeNull()
+  })
+})

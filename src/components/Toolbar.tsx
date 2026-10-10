@@ -5,6 +5,7 @@ import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
 import { parseDocument, serialize } from '../model'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
+import { PlayBar } from './PlayBar'
 
 const STACK_OFFSET = 24
 
@@ -13,6 +14,7 @@ export function Toolbar() {
   const { getViewport, setViewport } = useReactFlow()
   const fileInput = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<BannerMessage | null>(null)
+  const playing = useEditorStore((s) => s.playing)
 
   const handleAdd = () => {
     const { width, height, transform } = flowStore.getState()
@@ -93,7 +95,10 @@ export function Toolbar() {
       <div className="toolbar">
         <span className="toolbar__title">Node Sandbox</span>
         <button onClick={handleNew}>New</button>
-        <button onClick={handleAdd}>Add node</button>
+        {/* The document is read-only in play mode. */}
+        <button onClick={handleAdd} disabled={playing}>
+          Add node
+        </button>
         <button onClick={handleSave}>Save</button>
         <button onClick={handleLoadClick}>Load</button>
         <input
@@ -103,6 +108,7 @@ export function Toolbar() {
           hidden
           onChange={handleFile}
         />
+        <PlayBar />
       </div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
     </>
