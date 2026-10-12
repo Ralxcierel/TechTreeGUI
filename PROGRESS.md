@@ -2,9 +2,9 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (2026-10-12, at the P5-0 review gate)
+## Resume here (session ended 2026-10-12, at the P5-0 review gate)
 1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (743 tests at hand-off).
-2. **`docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). Waiting on the developer: review of P5-0 (undo/redo), commit `27f17a1`.**
+2. **The developer closed the session before reviewing P5-0; nothing is half-done.** `docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). Waiting on the developer: review of P5-0 (undo/redo), commit `27f17a1`.**
 3. After approval: start **P5-1 (autosave and recovery, D11)**. Restate it first, flag new decisions, build, test, self-review, independent review loop (max 3 rounds), stop at the gate, push.
 4. DESIGN Phase 4 is complete and approved (2026-10-12).
 5. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
