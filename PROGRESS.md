@@ -2,11 +2,11 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (2026-10-12, DESIGN Phase 5 plan drafted, waiting for approval)
-1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (694 tests at hand-off).
-2. **DESIGN Phase 4 is complete and approved (2026-10-12).**
-3. **Waiting on the developer: approval of `docs/PLAN-phase5.md`** (Phase 5, quality of life: D1–D12, assumptions, Q1–Q6). D9 adds a new dependency (`html-to-image` 1.11.11) and D7 a schema change (v5 `frames`); both need explicit confirmation. No Phase 5 code has been written.
-4. After approval: build **P5-0 (skeleton: undo/redo)**. Restate it first, flag new decisions, build, test, self-review, independent review loop (max 3 rounds), stop at the gate, push.
+## Resume here (2026-10-12, at the P5-0 review gate)
+1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (743 tests at hand-off).
+2. **`docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). Waiting on the developer: review of P5-0 (undo/redo), commit `27f17a1`.**
+3. After approval: start **P5-1 (autosave and recovery, D11)**. Restate it first, flag new decisions, build, test, self-review, independent review loop (max 3 rounds), stop at the gate, push.
+4. DESIGN Phase 4 is complete and approved (2026-10-12).
 5. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
 6. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
 7. Shell gotchas: in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script (hit again 2026-10-10); a long heredoc also failed with "unexpected EOF". Never start a Bash command with a bare `cat > file` before a heredoc meant for another program: it waits for input forever (2026-10-11). For bigger edits write a Python script to the scratchpad with the Write tool and run it with `python -I <path>`; use the Edit tool for lines with escapes.
@@ -19,13 +19,24 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
    - 2026-10-11: with no emulation the pane was only 402 px wide, and the canvas then has zero width (so fit/visibility can't be checked there); 1280×720 emulation with the ÷ 1.6 mapping worked again.
 
 ## Where we are
-- **DESIGN Phase 5 (quality of life): plan drafted in `docs/PLAN-phase5.md`, waiting for approval.**
+- **DESIGN Phase 5 (quality of life): plan approved 2026-10-12 (`docs/PLAN-phase5.md`); P5-0 built, waiting for review.**
 - **DESIGN Phase 4 (tech-tree features) is complete and approved** (2026-10-12). `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
   - Skeleton P4-0: cycle detection on prerequisite edges → Problems panel → marked cards (no schema change).
   - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
 - **DESIGN Phase 3 is complete and approved** (2026-10-09). Plan `docs/PLAN-phase3.md`; all of P3-0 to P3-5 approved. The developer chose to keep the "no generic side dot under a centred named handle" behaviour from P3-4.
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
+
+## Done (DESIGN Phase 5, in progress)
+- **P5-0 undo/redo** (commit `27f17a1`, waiting for the developer's review):
+  - `src/editor/history.ts` (pure): `History { past, future, group }`, `record` (joins the newest step when the group matches; clears redo), `undo`, `redo`, `endGroup`, `HISTORY_LIMIT` 100.
+  - Store: a wrapped `set` records the previous document whenever an update changes `doc` and doesn't carry `history` itself (undo, redo, load, save, `selectNodes` do). Module-level groups: `inGroup(key)` per action (`value:<node>:<key>` also for emptying a value, `override:…`, `nodeType:<id>:<patch keys>`, `edgeType:…`, `field:…`, `default:…`, `handle:…`, `tier:<id>`, `name`, `spacing`); a drag group from `startDrag` (React Flow's `onNodeDragStart`, also called for selection-box drags) to `dropNodes` (the snap joins the step); removals in the same microtask share a group (the Delete key sends edge and node removals separately); nudges group as `move:<sorted ids>`. A group ends on selection changes, `endUndoGroup`, save, undo/redo. Undo/redo: not in play mode, not mid-drag; restore keeps only existing selection/open sections and closes a type editor whose type is gone. New/Load clear the history.
+  - `useShortcuts.ts` (window keydown: Ctrl/⌘+Z undo, Ctrl/⌘+Shift+Z and Ctrl/⌘+Y redo, `e.code` fallback for other alphabets; ignored in text boxes, so they keep their own text undo), `useUndoBoundaries.ts` (window `focusout` and `change` end the group, except `change` from number boxes so spinner steps stay one step; `pointerup` + `setTimeout 0` closes a drag React Flow abandons), `HistoryButtons.tsx` (Undo/Redo in the toolbar after New, disabled with nothing to do or in play mode). On-card text commits end their group.
+  - `NumberInput` / `ListInput` now show a value changed elsewhere (undo) even while focused, but keep their own mid-typing drafts ("1e2", a trailing new line); `ListInput` saves nothing when only spaces/blank lines change.
+  - 743 tests (pure history; store: every kind of change, drags incl. snap and selection box, two drags in a row, abandoned drag, nudges, typing, emptying, selection/leave boundaries, Delete grouping, removals at different moments, save/unsaved, New/Load, play mode, mid-drag, restore, cap; buttons; shortcuts incl. text boxes; boundaries; inputs).
+  - In the browser (1280×720, real mouse and keyboard; one link made from the console): added 2 nodes with Add node; a real drag = 1 step, Ctrl+Z put it back on screen; click + Delete on a linked node = 1 step, Ctrl+Z restored node and edge; typing " Age" in the inspector = 1 step, Ctrl+Z inside the box used the box's own undo (app history untouched); after typing " Era" and clicking the canvas, Ctrl+Z undid the whole word; Redo/Undo/Undo buttons; type Width 220 → typed 300 → Undo: box shows 220 again (the round-1 bug). Console: only stale Vite HMR messages from before the reload (older module timestamps).
+  - Independent review, 3 rounds. Round 1 found **a bug**: NumberInput/ListInput kept stale drafts after undo (fixed, checked in the browser); also a drag group that could leak when React Flow abandons a drag, groups merging edits far apart in time, emptying a box splitting a group, a step per nudge, two tests that couldn't fail. Round 2 (no bugs): on-card Enter commits didn't end their group in browsers without focusout on removal; empty list steps; four weak tests (checked by breaking the code). Round 3 (no bugs), applied without another review: number-box stepping kept in one step, no undo mid-drag, two tests tightened.
+  - Known and accepted: on macOS Safari/Firefox (where clicking a button doesn't take focus), the spacing, colour, dash and icon-override boxes can show a stale draft after clicking Undo until they lose focus (NumberInput/ListInput are fixed); the hover text says "Ctrl" also on macOS (⌘ works); a node brought back by undo is unmeasured for a frame (like a new node); holding Ctrl+Z repeats undo; a typing group survives non-document actions like toggling play mode.
 
 ## Done (DESIGN Phase 4, complete)
 - **P4-7 Phase 4 gate** (commit `2fc7e1c`, approved 2026-10-12):
@@ -310,8 +321,10 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
-### Phase 5 (plan draft, `docs/PLAN-phase5.md`)
-- **Waiting:** approval of the plan. Open: D1–D12 (incl. **D9 new dependency `html-to-image` 1.11.11** and **D7 schema v5 `frames`**), the assumptions in §5, and Q1 (positions in the game export), Q2 (lanes/rings in pictures), Q3 (defaults filled into game-export data), Q4 (Ctrl+F), Q5 (annotations = frames + Note nodes), Q6 (copy/paste frames).
+### Phase 5 (`docs/PLAN-phase5.md`, approved 2026-10-12)
+- **Waiting:** developer review of P5-0.
+- **[DECISION]** (approved) D1–D12; Q1 game export includes positions; Q2 no lanes/rings in pictures yet; Q3 defaults filled into game-export data; Q4 Ctrl+F focuses the app's search; Q5 frames + Note nodes are the annotations; Q6 frames copy/paste with their nodes.
+- **[ASSUMPTION]** (P5-0) Undo groups also end when an editor box loses focus, a choice is picked (native `change`, except number boxes), the selection changes, or an on-card edit is committed; consecutive arrow-key nudges of the same nodes are one step; undo is ignored while a drag is held. (Refinements of D2 found in review, so a typed word, a pick or a nudge run each stay one step.)
 
 ### Phase 4
 - Plan approved 2026-10-10 (all recommended). The decisions D1–D12, assumptions and Q1–Q5 answers are in `docs/PLAN-phase4.md` §4–6.
