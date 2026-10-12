@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FIVE_NODES, FIVE_NODES_V2, FIVE_NODES_V3 } from './__fixtures__'
+import { FIVE_NODES, FIVE_NODES_V2, FIVE_NODES_V3, FIVE_NODES_V4 } from './__fixtures__'
 import { createEmptyDocument, DEFAULT_NODE_TYPE_ID } from './defaults'
 import {
   addNode,
@@ -11,7 +11,7 @@ import {
   withModified,
 } from './operations'
 import { parseDocument, serialize } from './serialize'
-import { CURRENT_SCHEMA_VERSION } from './types'
+import { CURRENT_SCHEMA_VERSION, type GraphDocument } from './types'
 
 function parseOk(text: string) {
   const result = parseDocument(text)
@@ -27,19 +27,58 @@ describe('serialize / parseDocument round trip', () => {
     expect(serialize(doc)).toBe(FIVE_NODES)
   })
 
-  it('loads the schema v2 file and saves it as the same graph in v4 (handles: [])', () => {
+  it('loads the schema v2 file and saves it as the same graph in v5 (handles: [])', () => {
     const doc = parseOk(FIVE_NODES_V2)
-    expect(doc.schemaVersion).toBe(4)
+    expect(doc.schemaVersion).toBe(5)
     expect(doc.nodeTypes.every((t) => t.handles.length === 0)).toBe(true)
     expect(serialize(doc)).toBe(FIVE_NODES)
   })
 
-  it('loads the schema v3 file and saves it as the same graph in v4 (default layout, no tiers)', () => {
+  it('loads the schema v3 file and saves it as the same graph in v5 (default layout, no tiers)', () => {
     const doc = parseOk(FIVE_NODES_V3)
-    expect(doc.schemaVersion).toBe(4)
+    expect(doc.schemaVersion).toBe(5)
     expect(doc.layout).toEqual({ direction: 'down', spacing: 250, tiers: [] })
     expect(doc.nodes.every((n) => n.tierId === null)).toBe(true)
     expect(serialize(doc)).toBe(FIVE_NODES)
+  })
+
+  it('loads the schema v4 file and saves it as the same graph in v5 (no frames)', () => {
+    const doc = parseOk(FIVE_NODES_V4)
+    expect(doc.schemaVersion).toBe(5)
+    expect(doc.frames).toEqual([])
+    expect(serialize(doc)).toBe(FIVE_NODES)
+  })
+
+  it('round-trips frames, keeping unknown keys inside them', () => {
+    let doc = createEmptyDocument('Frames', new Date('2026-01-01T00:00:00Z'))
+    doc = addNode(doc, DEFAULT_NODE_TYPE_ID, { x: 10, y: 20 }, 'n_a')
+    doc = {
+      ...doc,
+      frames: [
+        {
+          id: 'f_1',
+          title: 'Early metals',
+          note: 'Bronze and iron',
+          color: '#38bdf8',
+          position: { x: -40.5, y: 0 },
+          size: { width: 600, height: 400.25 },
+        },
+        {
+          id: 'f_2',
+          title: '',
+          note: '',
+          color: 'red',
+          position: { x: 1000, y: 1000 },
+          size: { width: 160, height: 100 },
+          extra: { kept: true },
+        } as GraphDocument['frames'][number],
+      ],
+    }
+    const text = serialize(doc)
+    expect(text.indexOf('"frames"')).toBeGreaterThan(text.indexOf('"edges"'))
+    expect(text.indexOf('"frames"')).toBeLessThan(text.indexOf('"layout"'))
+    expect(parseOk(text)).toEqual(doc)
+    expect(serialize(parseOk(text))).toBe(text)
   })
 
   it('round-trips layout settings, tiers and tier assignments (including an unknown tier id)', () => {

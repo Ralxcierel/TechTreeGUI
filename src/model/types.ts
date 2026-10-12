@@ -1,7 +1,7 @@
-// Graph document schema, version 4. See docs/PLAN.md §1.
+// Graph document schema, version 5. See docs/PLAN.md §1.
 // Pure data types: no React or UI imports anywhere in src/model/.
 
-export const CURRENT_SCHEMA_VERSION = 4
+export const CURRENT_SCHEMA_VERSION = 5
 
 export type FieldKind = 'text' | 'number' | 'enum' | 'boolean' | 'list' | 'richtext' | 'image'
 export type FieldPlacement = 'card' | 'tooltip' | 'expanded'
@@ -130,6 +130,21 @@ export interface LayoutSettings {
   tiers: Tier[]
 }
 
+/**
+ * A titled, coloured rectangle drawn behind a group of nodes (schema v5, decision D7 of Phase 5).
+ * Nodes don't belong to a frame in the data: being inside one is purely geometric (D8).
+ */
+export interface Frame {
+  id: string
+  title: string
+  note: string
+  /** CSS colour of the border and (faded) fill. */
+  color: string
+  /** Top-left corner, in flow units. */
+  position: Position
+  size: { width: number; height: number }
+}
+
 export interface DocumentMeta {
   name: string
   created: string
@@ -143,6 +158,7 @@ export interface GraphDocument {
   edgeTypes: EdgeType[]
   nodes: GraphNode[]
   edges: GraphEdge[]
+  frames: Frame[]
   layout: LayoutSettings
   view: { viewport: Viewport }
 }

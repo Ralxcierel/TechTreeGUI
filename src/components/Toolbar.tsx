@@ -3,7 +3,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { activeNodeTypeId, useEditorStore } from '../editor/store'
 import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
-import { parseDocument, serialize } from '../model'
+import { EMPTY_FRAME_SIZE, parseDocument, serialize } from '../model'
 import { AutoLayoutButton } from './AutoLayoutButton'
 import { HistoryButtons } from './HistoryButtons'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
@@ -38,6 +38,20 @@ export function Toolbar() {
     addNode(nodeType.id, {
       x: Math.round(center.x - nodeType.style.width / 2 + offset),
       y: Math.round(center.y + offset),
+    })
+    setError(null)
+  }
+
+  // A frame around the selected nodes, or an empty one in the middle of the view (D8).
+  const handleAddFrame = () => {
+    const { width, height, transform } = flowStore.getState()
+    const center = paneCenter(width, height, transform)
+    useEditorStore.getState().addFrame({
+      position: {
+        x: Math.round(center.x - EMPTY_FRAME_SIZE.width / 2),
+        y: Math.round(center.y - EMPTY_FRAME_SIZE.height / 2),
+      },
+      size: { ...EMPTY_FRAME_SIZE },
     })
     setError(null)
   }
@@ -101,6 +115,13 @@ export function Toolbar() {
         {/* The document is read-only in play mode. */}
         <button onClick={handleAdd} disabled={playing}>
           Add node
+        </button>
+        <button
+          onClick={handleAddFrame}
+          disabled={playing}
+          title="Adds a frame around the selected nodes, or an empty one in the middle of the view"
+        >
+          Add frame
         </button>
         <AutoLayoutButton />
         <button onClick={handleSave}>Save</button>

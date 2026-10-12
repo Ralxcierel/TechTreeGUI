@@ -34,11 +34,18 @@ function v3ToV4(doc: RawDocument): RawDocument {
   return { ...doc, layout: { direction: 'down', spacing: 250, tiers: [] }, schemaVersion: 4 }
 }
 
+/** v4 → v5: documents gain `frames` (decision D7 of Phase 5), none to start with. */
+function v4ToV5(doc: RawDocument): RawDocument {
+  if ('frames' in doc) return { ...doc, schemaVersion: 5 }
+  return { ...doc, frames: [], schemaVersion: 5 }
+}
+
 /** Keyed by the version a migration upgrades *from*. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: v1ToV2,
   2: v2ToV3,
   3: v3ToV4,
+  4: v4ToV5,
 }
 
 export type MigrateResult = { ok: true; doc: RawDocument } | { ok: false; error: string }

@@ -167,10 +167,160 @@ describe('validateDocument', () => {
       (d: ReturnType<typeof fixture>) => (d.nodes[0].tierId = 3),
       'nodes[0].tierId must be a string or null.',
     ],
+    ['frames list', (d: ReturnType<typeof fixture>) => delete d.frames, 'frames is missing.'],
+    [
+      'frame id',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            id: ' ',
+          },
+        ]),
+      'frames[0].id must not be empty or blank.',
+    ],
+    [
+      'frame title',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            title: 3,
+          },
+        ]),
+      'frames[0].title must be a string.',
+    ],
+    [
+      'frame note',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            note: undefined,
+          },
+        ]),
+      'frames[0].note is missing.',
+    ],
+    [
+      'frame colour',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            color: null,
+          },
+        ]),
+      'frames[0].color must be a string.',
+    ],
+    [
+      'frame position',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            position: { x: 'a', y: 0 },
+          },
+        ]),
+      'frames[0].position.x must be a finite number.',
+    ],
+    [
+      'frame size',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            size: { width: 0, height: 100 },
+          },
+        ]),
+      'frames[0].size.width must be positive.',
+    ],
+    [
+      'frame size object',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            ...{
+              id: 'f1',
+              title: 'T',
+              note: '',
+              color: '#fff',
+              position: { x: 0, y: 0 },
+              size: { width: 200, height: 100 },
+            },
+            size: 5,
+          },
+        ]),
+      'frames[0].size must be an object.',
+    ],
+    [
+      'duplicate frame id',
+      (d: ReturnType<typeof fixture>) =>
+        (d.frames = [
+          {
+            id: 'f1',
+            title: 'T',
+            note: '',
+            color: '#fff',
+            position: { x: 0, y: 0 },
+            size: { width: 200, height: 100 },
+          },
+          {
+            id: 'f1',
+            title: 'T',
+            note: '',
+            color: '#fff',
+            position: { x: 0, y: 0 },
+            size: { width: 200, height: 100 },
+          },
+        ]),
+      'frames[1].id duplicates frames[0].id ("f1").',
+    ],
     [
       'schemaVersion',
       (d: ReturnType<typeof fixture>) => (d.schemaVersion = 1),
-      'schemaVersion must be 4.',
+      'schemaVersion must be 5.',
     ],
   ])('reports a bad %s', (_name, breakIt, message) => {
     const raw = fixture()

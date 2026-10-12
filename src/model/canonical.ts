@@ -16,7 +16,17 @@ const position: Shape = { keys: ['x', 'y'] }
 const nodeStyleKeys = ['shape', 'width', 'fill', 'border', 'icon'] as const
 
 const DOCUMENT: Shape = {
-  keys: ['schemaVersion', 'meta', 'nodeTypes', 'edgeTypes', 'nodes', 'edges', 'layout', 'view'],
+  keys: [
+    'schemaVersion',
+    'meta',
+    'nodeTypes',
+    'edgeTypes',
+    'nodes',
+    'edges',
+    'frames',
+    'layout',
+    'view',
+  ],
   children: {
     meta: { keys: ['name', 'created', 'modified'] },
     nodeTypes: [
@@ -42,6 +52,12 @@ const DOCUMENT: Shape = {
       },
     ],
     edges: [{ keys: ['id', 'typeId', 'source', 'target', 'sourceHandle', 'targetHandle'] }],
+    frames: [
+      {
+        keys: ['id', 'title', 'note', 'color', 'position', 'size'],
+        children: { position, size: { keys: ['width', 'height'] } },
+      },
+    ],
     layout: {
       keys: ['direction', 'spacing', 'tiers'],
       children: { tiers: [{ keys: ['id', 'name'] }] },

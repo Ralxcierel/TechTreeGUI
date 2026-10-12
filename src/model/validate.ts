@@ -18,6 +18,7 @@ import {
   type FieldDef,
   type FieldKind,
   type FieldPlacement,
+  type Frame,
   type GraphDocument,
   type GraphEdge,
   type GraphNode,
@@ -407,6 +408,44 @@ function readLayout(r: Reader, value: unknown): LayoutSettings | undefined {
   return { ...o, direction, spacing, tiers }
 }
 
+function readFrame(r: Reader, value: unknown, path: string): Frame | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  const id = r.id(o, 'id', path)
+  const title = r.string(o, 'title', path)
+  const note = r.string(o, 'note', path)
+  const color = r.string(o, 'color', path)
+  const pos = r.object(o.position, `${path}.position`)
+  const x = pos && r.number(pos, 'x', `${path}.position`)
+  const y = pos && r.number(pos, 'y', `${path}.position`)
+  const size = r.object(o.size, `${path}.size`)
+  const width = size && r.positive(size, 'width', `${path}.size`)
+  const height = size && r.positive(size, 'height', `${path}.size`)
+  if (
+    id === undefined ||
+    title === undefined ||
+    note === undefined ||
+    color === undefined ||
+    !pos ||
+    x === undefined ||
+    y === undefined ||
+    !size ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return undefined
+  }
+  return {
+    ...o,
+    id,
+    title,
+    note,
+    color,
+    position: { ...pos, x, y },
+    size: { ...size, width, height },
+  }
+}
+
 function readView(r: Reader, value: unknown): GraphDocument['view'] | undefined {
   const view = r.object(value, 'view')
   if (!view) return undefined
@@ -440,6 +479,11 @@ function checkIntegrity(r: Reader, doc: GraphDocument): void {
   r.unique(
     doc.edges.map((e) => e.id),
     'edges',
+    'id',
+  )
+  r.unique(
+    doc.frames.map((f) => f.id),
+    'frames',
     'id',
   )
   r.unique(
@@ -481,6 +525,7 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
   const edgeTypes = r.items(raw.edgeTypes, 'edgeTypes', (v, p) => readEdgeType(r, v, p))
   const nodes = r.items(raw.nodes, 'nodes', (v, p) => readNode(r, v, p))
   const edges = r.items(raw.edges, 'edges', (v, p) => readEdge(r, v, p))
+  const frames = r.items(raw.frames, 'frames', (v, p) => readFrame(r, v, p))
   const layout = readLayout(r, raw.layout)
   const view = readView(r, raw.view)
 
@@ -491,6 +536,7 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
     !edgeTypes ||
     !nodes ||
     !edges ||
+    !frames ||
     !layout ||
     !view
   ) {
@@ -505,6 +551,7 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
     edgeTypes,
     nodes,
     edges,
+    frames,
     layout,
     view,
   }

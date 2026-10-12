@@ -36,6 +36,28 @@ describe('Toolbar: Add node', () => {
   })
 })
 
+describe('Toolbar: Add frame', () => {
+  it('adds an empty frame in the middle of the view, or one around the selected nodes', () => {
+    renderToolbar()
+    fireEvent.click(screen.getByRole('button', { name: 'Add frame' }))
+    // jsdom: a 0×0 pane, so the middle of the view is 0,0.
+    expect(s().doc.frames[0]).toMatchObject({
+      position: { x: -200, y: -150 },
+      size: { width: 400, height: 300 },
+    })
+    s().addNode('technology', { x: 1000, y: 1000 })
+    s().selectNodes([s().doc.nodes[0]!.id])
+    fireEvent.click(screen.getByRole('button', { name: 'Add frame' }))
+    expect(s().doc.frames[1]!.position).toEqual({ x: 960, y: 928 })
+  })
+
+  it('is disabled while playing', () => {
+    s().setPlaying(true)
+    renderToolbar()
+    expect(screen.getByRole('button', { name: 'Add frame' }).matches(':disabled')).toBe(true)
+  })
+})
+
 describe('Toolbar: play mode', () => {
   it('disables Add node while playing', () => {
     renderToolbar()

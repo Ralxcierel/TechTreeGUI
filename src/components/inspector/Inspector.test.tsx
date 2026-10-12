@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { FlowNode } from '../../editor/flowAdapter'
 import { useEditorStore } from '../../editor/store'
 import { DEFAULT_NODE_TYPE_ID } from '../../model'
 import { Inspector } from './Inspector'
@@ -48,7 +49,7 @@ describe('Inspector', () => {
 
     fireEvent.change(title, { target: { value: 'Bronze Working' } })
     expect(s().doc.nodes[0]?.data.title).toBe('Bronze Working')
-    expect(s().flowNodes[0]?.data.values.title).toBe('Bronze Working')
+    expect((s().flowNodes[0] as FlowNode).data.values.title).toBe('Bronze Working')
     expect(title).toHaveProperty('value', 'Bronze Working')
   })
 
@@ -78,6 +79,25 @@ describe('Inspector', () => {
     render(<Inspector />)
     select(ids, [s().doc.edges[0]!.id])
     expect(screen.getByText('2 nodes, 1 edge selected.')).toBeTruthy()
+  })
+
+  it('edits a selected frame, and counts frames in a larger selection', () => {
+    const [n] = addNodes(1)
+    s().addFrame({ position: { x: 0, y: 0 }, size: { width: 400, height: 300 } })
+    render(<Inspector />)
+    expect(screen.getByRole('heading', { name: 'Frame' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Early metals' } })
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Bronze, iron' } })
+    fireEvent.change(screen.getByLabelText('Frame colour picker'), {
+      target: { value: '#ff0000' },
+    })
+    expect(s().doc.frames[0]).toMatchObject({
+      title: 'Early metals',
+      note: 'Bronze, iron',
+      color: '#ff0000',
+    })
+    select([n!])
+    expect(screen.getByText('1 node, 1 frame selected.')).toBeTruthy()
   })
 
   it('shows the edge inspector for a single selected edge', () => {

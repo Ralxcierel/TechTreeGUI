@@ -7,6 +7,7 @@ import {
   pasteFragment,
   type Fragment,
 } from './clipboard'
+import { addFrame } from './frames'
 import { addTier, setNodeTier } from './layout'
 import { createNodeType } from './nodeTypes'
 import { addNode, connect } from './operations'
@@ -205,5 +206,83 @@ describe('pasteFragment', () => {
     const pasted = pasteFragment(target, extraNodeType, { x: 0, y: 0 }).doc
     expect(pasted.nodeTypes).toEqual(target.nodeTypes)
     expect(parseDocument(serialize(next)).ok).toBe(true)
+  })
+})
+
+describe('frames in fragments (Q6)', () => {
+  const size = () => ({ width: 100, height: 60 })
+  /** A frame around a and b (not c), with a small frame inside it, and one far away. */
+  function framed() {
+    const base = sample() // a x 0, b x 100, c x 200, d x 300; all at y 10
+    let doc = addFrame(
+      base.doc,
+      { position: { x: -50, y: -50 }, size: { width: 260, height: 200 } },
+      'outer',
+    ).doc
+    doc = addFrame(
+      doc,
+      { position: { x: -40, y: -40 }, size: { width: 50, height: 50 } },
+      'inner',
+    ).doc
+    doc = addFrame(
+      doc,
+      { position: { x: 5000, y: 0 }, size: { width: 200, height: 200 } },
+      'far',
+    ).doc
+    return { ...base, doc }
+  }
+
+  it('a copied frame brings the nodes and frames inside it, and the edges among the nodes', () => {
+    const { doc, a, b } = framed()
+    const f = copyFragment(doc, [], { ids: ['outer'], sizeOf: size })!
+    expect(f.nodes.map((n) => n.id)).toEqual([a, b])
+    expect(f.edges.map((e) => [e.source, e.target])).toEqual([[a, b]])
+    expect(f.frames.map((fr) => fr.id)).toEqual(['outer', 'inner'])
+    expect(roundTrip(f)).toEqual(f)
+  })
+
+  it('copies selected nodes and frames together, and a frame alone when it is empty', () => {
+    const { doc, c } = framed()
+    const f = copyFragment(doc, [c], { ids: ['far'], sizeOf: size })!
+    expect(f.nodes.map((n) => n.id)).toEqual([c])
+    expect(f.frames.map((fr) => fr.id)).toEqual(['far'])
+    const empty = copyFragment(doc, [], { ids: ['far'], sizeOf: size })!
+    expect(empty.nodes).toEqual([])
+    expect(empty.frames).toHaveLength(1)
+    expect(copyFragment(doc, [], { ids: ['missing'], sizeOf: size })).toBeNull()
+  })
+
+  it('pastes frames with new ids, moved by the offset', () => {
+    const { doc } = framed()
+    const f = copyFragment(doc, [], { ids: ['outer'], sizeOf: size })!
+    const result = pasteFragment(doc, f, { x: 40, y: 40 })
+    expect(result.frameIds).toHaveLength(2)
+    expect(result.frameIds.some((id) => doc.frames.some((fr) => fr.id === id))).toBe(false)
+    const pasted = result.doc.frames.slice(doc.frames.length)
+    expect(pasted.map((fr) => fr.position)).toEqual([
+      { x: -10, y: -10 },
+      { x: 0, y: 0 },
+    ])
+    expect(pasted.map((fr) => fr.title)).toEqual(['Frame', 'Frame'])
+    expect(parseDocument(serialize(result.doc)).ok).toBe(true)
+  })
+
+  it('reads a fragment from before frames (v4) with none', () => {
+    const { doc, a } = sample()
+    const raw = JSON.parse(fragmentText(copyFragment(doc, [a])!))
+    raw.schemaVersion = 4
+    delete raw.frames
+    const read = parseFragment(JSON.stringify(raw))
+    expect(read.kind === 'ok' && read.fragment.frames).toEqual([])
+  })
+
+  it('refuses a fragment with a broken frame', () => {
+    const { doc } = framed()
+    const raw = JSON.parse(fragmentText(copyFragment(doc, [], { ids: ['far'], sizeOf: size })!))
+    raw.frames[0].size = 'big'
+    expect(parseFragment(JSON.stringify(raw))).toEqual({
+      kind: 'invalid',
+      errors: ['frames[0].size must be an object.'],
+    })
   })
 })

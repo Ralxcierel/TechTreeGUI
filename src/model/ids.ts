@@ -6,6 +6,10 @@ export function newEdgeId(): string {
   return `e_${crypto.randomUUID()}`
 }
 
+export function newFrameId(): string {
+  return `f_${crypto.randomUUID()}`
+}
+
 /**
  * A type id made from its display name (decision D10): "Unlocks Tech" → "unlocks-tech", then
  * "unlocks-tech-2" and so on if that id is taken. A name with no letters or digits uses `fallback`.

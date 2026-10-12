@@ -84,7 +84,7 @@ describe('toFlowNodes', () => {
     }
     const second = toFlowNodes(restyled, emptyUi(), first)
     expect(second[0]).not.toBe(first[0])
-    expect(second[0]?.data.overrides).toEqual({ fill: '#f00' })
+    expect(second[0]?.type === 'graph' && second[0].data.overrides).toEqual({ fill: '#f00' })
     expect(second[1]).toBe(first[1])
   })
 

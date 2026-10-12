@@ -1,6 +1,7 @@
 // DESIGN.md Phase 1 "done when": build a 5-node graph, save it, reload the app, load the file,
 // and see the identical graph. This drives the same store actions the UI uses.
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { FlowNode } from './flowAdapter'
 import { DEFAULT_NODE_TYPE_ID, parseDocument, serialize } from '../model'
 import { useEditorStore } from './store'
 
@@ -53,7 +54,7 @@ describe('Phase 1 acceptance', () => {
     const { doc, flowNodes } = store.getState()
     expect(doc).toEqual(saved)
     expect(serialize(doc)).toBe(file)
-    expect(flowNodes.map((n) => n.data.values.title)).toEqual(titles)
+    expect(flowNodes.map((n) => (n as FlowNode).data.values.title)).toEqual(titles)
     expect(doc.edges).toHaveLength(4)
     expect(doc.nodes[4]?.position).toEqual({ x: 300, y: 320 })
     expect(doc.view.viewport).toEqual({ x: 12, y: 34, zoom: 0.75 })

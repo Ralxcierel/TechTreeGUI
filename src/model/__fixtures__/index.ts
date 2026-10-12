@@ -2,6 +2,7 @@
 import fiveNodesRaw from './five-nodes.json?raw'
 import fiveNodesV2Raw from './five-nodes-v2.json?raw'
 import fiveNodesV3Raw from './five-nodes-v3.json?raw'
+import fiveNodesV4Raw from './five-nodes-v4.json?raw'
 
 /** A valid 5-node, 4-edge document in canonical form (as `serialize` writes it). */
 // Line endings normalised so tests don't depend on git's CRLF conversion on Windows checkouts.
@@ -12,3 +13,6 @@ export const FIVE_NODES_V2 = fiveNodesV2Raw.replace(/\r\n/g, '\n')
 
 /** The same document as saved by schema v3 (before layout settings and tiers), for v3 → v4. */
 export const FIVE_NODES_V3 = fiveNodesV3Raw.replace(/\r\n/g, '\n')
+
+/** The same document as saved by schema v4 (before frames), for v4 → v5. */
+export const FIVE_NODES_V4 = fiveNodesV4Raw.replace(/\r\n/g, '\n')

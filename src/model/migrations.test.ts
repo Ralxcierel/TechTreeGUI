@@ -127,3 +127,23 @@ describe('v3 → v4', () => {
     expect(v3ToV4({ schemaVersion: 3, layout: 'odd' })).toEqual({ schemaVersion: 4, layout: 'odd' })
   })
 })
+
+describe('v4 → v5', () => {
+  const v4ToV5 = MIGRATIONS[4]!
+
+  it('adds an empty frame list, keeping everything else', () => {
+    const input = { schemaVersion: 4, extra: 'kept', nodes: [{ id: 'a' }] }
+    expect(v4ToV5(input)).toEqual({
+      schemaVersion: 5,
+      extra: 'kept',
+      nodes: [{ id: 'a' }],
+      frames: [],
+    })
+    expect(input.schemaVersion).toBe(4)
+    expect('frames' in input).toBe(false)
+  })
+
+  it('keeps frames that are already there (the validator checks them)', () => {
+    expect(v4ToV5({ schemaVersion: 4, frames: 'odd' })).toEqual({ schemaVersion: 5, frames: 'odd' })
+  })
+})

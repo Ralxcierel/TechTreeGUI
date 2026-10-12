@@ -33,4 +33,16 @@ describe('Canvas: dropping nodes', () => {
     onNodeDragStop({} as never, node('a'), [node('a'), node('b')])
     expect(dropNodes).toHaveBeenCalledWith(['a', 'b'])
   })
+
+  it('passes every dragged node and frame to startDrag when a drag starts', () => {
+    const startDrag = vi.fn()
+    useEditorStore.setState({ startDrag })
+    render(<Canvas />)
+    const onNodeDragStart = props.current!.onNodeDragStart as NonNullable<
+      ComponentProps<typeof ReactFlow>['onNodeDragStart']
+    >
+    const node = (id: string) => ({ id, position: { x: 0, y: 0 }, data: {} })
+    onNodeDragStart({} as never, node('frame:f1'), [node('frame:f1'), node('a')])
+    expect(startDrag).toHaveBeenCalledWith(['frame:f1', 'a'])
+  })
 })

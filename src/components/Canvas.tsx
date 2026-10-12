@@ -15,16 +15,17 @@ import {
   type PointerEvent,
 } from 'react'
 import { selectCycleEdgeIds, selectSearchMatchSet, useEditorStore } from '../editor/store'
-import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
+import { handleIdsByNode, toFlowEdges, type CanvasNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
+import { FrameNode } from './nodes/FrameNode'
 import { GraphNode } from './nodes/GraphNode'
 import { TierLanes } from './TierLanes'
 import { TierRings } from './TierRings'
 import { isTextEntry } from './useShortcuts'
 
 // Defined outside the component so React Flow sees the same object on every render.
-const nodeTypes = { graph: GraphNode }
+const nodeTypes = { graph: GraphNode, frame: FrameNode }
 const edgeTypes = { graph: GraphEdge }
 const deleteKeys = ['Delete', 'Backspace']
 
@@ -45,6 +46,9 @@ function clearPageTextSelection(e: PointerEvent<HTMLDivElement>) {
   const selection = window.getSelection()
   if (selection && !selection.isCollapsed) selection.removeAllRanges()
 }
+
+/** Frames show faded on the minimap. */
+const miniMapClass = (node: CanvasNode) => (node.type === 'frame' ? 'minimap-frame' : '')
 
 export function Canvas() {
   const nodes = useEditorStore((s) => s.flowNodes)
@@ -92,7 +96,8 @@ export function Canvas() {
     [docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds, dimmedEdgeIds],
   )
   const miniMapColor = useCallback(
-    (node: FlowNode) => {
+    (node: CanvasNode) => {
+      if (node.type === 'frame') return node.data.frame.color
       const base = nodeTypeList.find((t) => t.id === node.data.typeId)?.style
       return base ? resolveNodeStyle(base, node.data.overrides).fill : '#64748b'
     },
@@ -104,8 +109,8 @@ export function Canvas() {
 
   // Play mode: a click unlocks or re-locks a node. The second click of a double-click is ignored,
   // so a double-click doesn't undo the first click (which may have re-locked dependent nodes too).
-  const onPlayClick = (e: MouseEvent, node: FlowNode) => {
-    if (e.detail <= 1) togglePlayUnlock(node.id)
+  const onPlayClick = (e: MouseEvent, node: CanvasNode) => {
+    if (e.detail <= 1 && node.type === 'graph') togglePlayUnlock(node.id)
   }
   // React Flow's own Enter/Space on a focused node only selects it; in play mode they also unlock
   // or re-lock it, so the keyboard can do what a click does. Only for the node itself, not for a
@@ -113,7 +118,7 @@ export function Canvas() {
   const onPlayKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!playing || e.repeat || (e.key !== 'Enter' && e.key !== ' ')) return
     const target = e.target as HTMLElement
-    if (!target.classList.contains('react-flow__node') || !target.dataset.id) return
+    if (!target.classList.contains('react-flow__node-graph') || !target.dataset.id) return
     e.preventDefault()
     togglePlayUnlock(target.dataset.id)
   }
@@ -132,7 +137,8 @@ export function Canvas() {
         connectionMode={ConnectionMode.Loose}
         onNodesChange={onNodesChange}
         // A drag is one undo step. React Flow calls these for drags of the selection box too.
-        onNodeDragStart={startDrag}
+        // A dragged frame carries the nodes and frames inside it (D8), decided here.
+        onNodeDragStart={(_, _node, dragged) => startDrag(dragged.map((n) => n.id))}
         // Dropped nodes snap into the tier lane or ring under them (D9, D12); `nodes` are all the
         // dragged ones.
         onNodeDragStop={(_, _node, nodes) => dropNodes(nodes.map((n) => n.id))}
@@ -168,7 +174,7 @@ export function Canvas() {
             ⌨
           </span>
         </Controls>
-        <MiniMap nodeColor={miniMapColor} pannable zoomable />
+        <MiniMap nodeColor={miniMapColor} nodeClassName={miniMapClass} pannable zoomable />
       </ReactFlow>
     </div>
   )

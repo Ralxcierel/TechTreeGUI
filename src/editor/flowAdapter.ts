@@ -4,9 +4,13 @@ import {
   deleteEdges,
   deleteNodes,
   HANDLE_SIDES,
+  moveFrames,
   moveNodes,
+  removeFrames,
+  resizeFrame,
   type EdgePath,
   type EdgeType,
+  type Frame,
   type GraphDocument,
   type GraphEdge,
   type GraphNode,
@@ -29,6 +33,30 @@ export type GraphNodeData = {
 }
 export type FlowNode = Node<GraphNodeData, 'graph'>
 
+/** A frame on the canvas (schema v5): a second node kind, drawn behind the cards. */
+export type FrameNodeData = { frame: Frame }
+export type FrameFlowNode = Node<FrameNodeData, 'frame'>
+/** Everything React Flow draws as a node. */
+export type CanvasNode = FlowNode | FrameFlowNode
+
+/** Frames' React Flow ids get this prefix, so they can never clash with node ids. */
+export const FRAME_PREFIX = 'frame:'
+export const frameFlowId = (frameId: string) => FRAME_PREFIX + frameId
+/** The frame id behind a React Flow id, or null for a node. */
+export const frameIdOf = (flowId: string) =>
+  flowId.startsWith(FRAME_PREFIX) ? flowId.slice(FRAME_PREFIX.length) : null
+/**
+ * Frames' z-index: below the cards even when selected (React Flow lifts selected nodes by 1000),
+ * so a selected frame never covers them.
+ */
+export const FRAME_Z = -2000
+
+/** What a dragged frame carries along (see `frameContents`), by frame id. */
+export type FrameCarry = ReadonlyMap<
+  string,
+  { nodeIds: readonly string[]; frameIds: readonly string[] }
+>
+
 export interface Size {
   width: number
   height: number
@@ -38,12 +66,19 @@ export interface Size {
 export interface UiState {
   selectedNodeIds: ReadonlySet<string>
   selectedEdgeIds: ReadonlySet<string>
+  /** Selected frames, by frame id (not React Flow id). */
+  selectedFrameIds: ReadonlySet<string>
   /** Rendered sizes reported by React Flow, passed back so it doesn't re-measure every update. */
   measured: ReadonlyMap<string, Size>
 }
 
 export function emptyUi(): UiState {
-  return { selectedNodeIds: new Set(), selectedEdgeIds: new Set(), measured: new Map() }
+  return {
+    selectedNodeIds: new Set(),
+    selectedEdgeIds: new Set(),
+    selectedFrameIds: new Set(),
+    measured: new Map(),
+  }
 }
 
 /**
@@ -63,21 +98,51 @@ export function uiForLoadedDocument(
     const size = prev.measured.get(n.id)
     if (size && prevTypes.get(n.id) === n.typeId) measured.set(n.id, size)
   }
-  return { selectedNodeIds: new Set(), selectedEdgeIds: new Set(), measured }
+  return {
+    selectedNodeIds: new Set(),
+    selectedEdgeIds: new Set(),
+    selectedFrameIds: new Set(),
+    measured,
+  }
 }
 
 /**
- * Builds React Flow nodes. When `prev` is given, a node whose inputs are unchanged keeps its
- * previous object, so React Flow (which compares by identity) skips work for it.
+ * Builds React Flow nodes: the frames first (drawn behind), then the nodes. When `prev` is given,
+ * one whose inputs are unchanged keeps its previous object, so React Flow (which compares by
+ * identity) skips work for it.
  */
-export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = []): FlowNode[] {
+export function toFlowNodes(
+  doc: GraphDocument,
+  ui: UiState,
+  prev: CanvasNode[] = [],
+): CanvasNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]))
-  return doc.nodes.map((n) => {
+  const frames = doc.frames.map((f): FrameFlowNode => {
+    const id = frameFlowId(f.id)
+    const selected = ui.selectedFrameIds.has(f.id)
+    const old = prevById.get(id)
+    if (old?.type === 'frame' && old.data.frame === f && old.selected === selected) return old
+    return {
+      id,
+      type: 'frame',
+      position: f.position,
+      data: { frame: f },
+      width: f.size.width,
+      height: f.size.height,
+      // The size is known, so React Flow doesn't hide the frame until it has measured it.
+      measured: f.size,
+      selected,
+      zIndex: FRAME_Z,
+      // Only the title strip starts a drag (D8); the body lets clicks through (see FrameNode).
+      dragHandle: '.frame-node__header',
+    }
+  })
+  const nodes = doc.nodes.map((n): FlowNode => {
     const selected = ui.selectedNodeIds.has(n.id)
     const measured = ui.measured.get(n.id)
     const old = prevById.get(n.id)
     if (
-      old &&
+      old?.type === 'graph' &&
       old.position === n.position &&
       old.data.values === n.data &&
       old.data.overrides === n.styleOverrides &&
@@ -96,6 +161,7 @@ export function toFlowNodes(doc: GraphDocument, ui: UiState, prev: FlowNode[] = 
       measured,
     }
   })
+  return [...frames, ...nodes]
 }
 
 /**
@@ -215,20 +281,56 @@ function pruneEdgeSelection(
 
 /**
  * Applies React Flow's node change events (drag, select, resize-measure, delete) to the model and
- * UI state. Returns the same objects for anything that didn't change.
+ * UI state, for nodes and frames. A dragged frame moves what `carry` lists for it by the same
+ * amount, unless those are dragged themselves. Returns the same objects for anything that didn't
+ * change.
  */
 export function reduceNodeChanges(
   doc: GraphDocument,
   ui: UiState,
   changes: readonly NodeChange[],
+  carry: FrameCarry = new Map(),
 ): { doc: GraphDocument; ui: UiState } {
   const moves = new Map<string, Position>()
   const removed: string[] = []
   let selected: Set<string> | null = null
   let selectedEdges: ReadonlySet<string> | null = null
   let measured: Map<string, Size> | null = null
+  const frameMoves = new Map<string, Position>()
+  const resizes = new Map<string, { width: number; height: number }>()
+  const removedFrames: string[] = []
+  let selectedFrames: Set<string> | null = null
 
+  // Frames resized from the top or left also get a position change in the same batch: that is
+  // part of the resize, never a drag (resizing doesn't carry anything).
+  const resizing = new Set(
+    changes.flatMap((c) => (c.type === 'dimensions' && c.resizing ? [c.id] : [])),
+  )
   for (const change of changes) {
+    const frameId = 'id' in change ? frameIdOf(change.id) : null
+    if (frameId !== null) {
+      switch (change.type) {
+        case 'position':
+          if (change.position) frameMoves.set(frameId, change.position)
+          break
+        case 'dimensions':
+          // Only the resize handles change a frame's size; measurements are ignored (its size is
+          // already the stored one).
+          if (change.dimensions && change.resizing) resizes.set(frameId, change.dimensions)
+          break
+        case 'select':
+          if (ui.selectedFrameIds.has(frameId) !== change.selected) {
+            selectedFrames ??= new Set(ui.selectedFrameIds)
+            if (change.selected) selectedFrames.add(frameId)
+            else selectedFrames.delete(frameId)
+          }
+          break
+        case 'remove':
+          removedFrames.push(frameId)
+          break
+      }
+      continue
+    }
     switch (change.type) {
       case 'position':
         if (change.position) moves.set(change.id, change.position)
@@ -257,7 +359,46 @@ export function reduceNodeChanges(
     }
   }
 
+  // What dragged frames carry: moved by the frame's step, unless dragged themselves.
+  const carriedFrames = new Map<string, Position>()
+  // Looked up once per batch (a drag sends a batch on every pointer move).
+  const framesById = carry.size > 0 ? new Map(doc.frames.map((f) => [f.id, f])) : new Map()
+  const nodesById = carry.size > 0 ? new Map(doc.nodes.map((n) => [n.id, n])) : new Map()
+  for (const [frameId, to] of frameMoves) {
+    const frame = framesById.get(frameId)
+    const load = carry.get(frameId)
+    if (!frame || !load || resizing.has(frameFlowId(frameId))) continue
+    const dx = to.x - frame.position.x
+    const dy = to.y - frame.position.y
+    if (dx === 0 && dy === 0) continue
+    for (const id of load.nodeIds) {
+      const node = nodesById.get(id)
+      if (node && !moves.has(id))
+        moves.set(id, { x: node.position.x + dx, y: node.position.y + dy })
+    }
+    for (const id of load.frameIds) {
+      const inner = framesById.get(id)
+      if (inner && !frameMoves.has(id) && !carriedFrames.has(id)) {
+        carriedFrames.set(id, { x: inner.position.x + dx, y: inner.position.y + dy })
+      }
+    }
+  }
+
   let nextDoc = moves.size > 0 ? moveNodes(doc, moves) : doc
+  for (const [frameId, size] of resizes) {
+    nextDoc = resizeFrame(nextDoc, frameId, size, frameMoves.get(frameId))
+    frameMoves.delete(frameId)
+  }
+  for (const [id, to] of carriedFrames) frameMoves.set(id, to)
+  if (frameMoves.size > 0) nextDoc = moveFrames(nextDoc, frameMoves)
+  if (removedFrames.length > 0) {
+    const afterFrames = removeFrames(nextDoc, removedFrames)
+    if (afterFrames !== nextDoc) {
+      selectedFrames ??= new Set(ui.selectedFrameIds)
+      for (const id of removedFrames) selectedFrames.delete(id)
+      nextDoc = afterFrames
+    }
+  }
   const afterRemove = removed.length > 0 ? deleteNodes(nextDoc, removed) : nextDoc
   if (afterRemove !== nextDoc) {
     selected ??= new Set(ui.selectedNodeIds)
@@ -274,10 +415,11 @@ export function reduceNodeChanges(
   }
 
   const nextUi =
-    selected || measured || selectedEdges
+    selected || measured || selectedEdges || selectedFrames
       ? {
           selectedNodeIds: selected ?? ui.selectedNodeIds,
           selectedEdgeIds: selectedEdges ?? ui.selectedEdgeIds,
+          selectedFrameIds: selectedFrames ?? ui.selectedFrameIds,
           measured: measured ?? ui.measured,
         }
       : ui

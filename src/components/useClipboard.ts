@@ -4,7 +4,7 @@
 // to the browser.
 import { useReactFlow, useStoreApi } from '@xyflow/react'
 import { useEffect, useState } from 'react'
-import { anyBoxInView } from '../editor/flowAdapter'
+import { anyBoxInView, frameFlowId } from '../editor/flowAdapter'
 import { selectNodeBoxes, useEditorStore } from '../editor/store'
 import type { BannerMessage } from './ErrorBanner'
 import { isTextEntry } from './useShortcuts'
@@ -21,11 +21,14 @@ export function useClipboard(): { error: BannerMessage | null; dismiss: () => vo
   const { fitView, getZoom } = useReactFlow()
 
   useEffect(() => {
-    /** Pans to pasted nodes that would all be out of sight (e.g. pasted into a new document). */
-    const showPasted = (ids: string[]) => {
+    /** Pans to pasted nodes and frames that would all be out of sight (e.g. in a new document). */
+    const showPasted = (nodeIds: string[], frameIds: string[]) => {
       const { width, height, transform } = flowStore.getState()
-      if (anyBoxInView(selectNodeBoxes(useEditorStore.getState(), ids), width, height, transform))
-        return
+      const state = useEditorStore.getState()
+      const frames = state.doc.frames.filter((f) => frameIds.includes(f.id))
+      const boxes = [...selectNodeBoxes(state, nodeIds), ...frames]
+      if (anyBoxInView(boxes, width, height, transform)) return
+      const ids = [...nodeIds, ...frameIds.map(frameFlowId)]
       // React Flow waits until the new nodes are measured; no zooming in further than now.
       void fitView({
         nodes: ids.map((id) => ({ id })),
@@ -53,7 +56,7 @@ export function useClipboard(): { error: BannerMessage | null; dismiss: () => vo
       e.preventDefault()
       if (result.kind === 'pasted') {
         setError(null)
-        showPasted(result.nodeIds)
+        showPasted(result.nodeIds, result.frameIds)
       } else {
         const count = result.errors.length
         setError({

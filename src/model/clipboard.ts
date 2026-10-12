@@ -1,13 +1,15 @@
 // Copy and paste of graph parts (D4, D5 of Phase 5). A fragment is self-contained: the copied
-// nodes, the edges between them, and the node and edge types they use, so it can be pasted into
-// another document (or another tab) that lacks those types.
+// nodes, the edges between them, the node and edge types they use, and copied frames (P5-4), so it
+// can be pasted into another document (or another tab) that lacks those types.
 import { isPlainObject } from './guards'
-import { newEdgeId, newNodeId } from './ids'
+import { frameContents } from './frames'
+import { newEdgeId, newFrameId, newNodeId } from './ids'
 import { connectionError } from './operations'
 import { parseDocument } from './serialize'
 import {
   CURRENT_SCHEMA_VERSION,
   type EdgeType,
+  type Frame,
   type GraphDocument,
   type GraphEdge,
   type GraphNode,
@@ -24,16 +26,35 @@ export interface Fragment {
   edgeTypes: EdgeType[]
   nodes: GraphNode[]
   edges: GraphEdge[]
+  frames: Frame[]
+}
+
+/** Copied frames, and how to size nodes to find what is inside them (see `frameContents`). */
+export interface FrameCopy {
+  ids: Iterable<string>
+  sizeOf: Parameters<typeof frameContents>[2]
 }
 
 /**
- * The given nodes (in document order), the edges with both ends among them, and the types they
- * use. Null when none of the ids is a node.
+ * The given nodes, plus every node and frame inside the given frames (Q6), in document order; the
+ * edges with both ends among those nodes, and the types they use. Null when there is nothing.
  */
-export function copyFragment(doc: GraphDocument, nodeIds: Iterable<string>): Fragment | null {
+export function copyFragment(
+  doc: GraphDocument,
+  nodeIds: Iterable<string>,
+  frames?: FrameCopy,
+): Fragment | null {
   const wanted = new Set(nodeIds)
+  const wantedFrames = new Set(frames?.ids ?? [])
+  for (const id of [...wantedFrames]) {
+    if (!doc.frames.some((f) => f.id === id)) continue
+    const inside = frameContents(doc, id, frames!.sizeOf)
+    for (const n of inside.nodeIds) wanted.add(n)
+    for (const f of inside.frameIds) wantedFrames.add(f)
+  }
   const nodes = doc.nodes.filter((n) => wanted.has(n.id))
-  if (nodes.length === 0) return null
+  const copiedFrames = doc.frames.filter((f) => wantedFrames.has(f.id))
+  if (nodes.length === 0 && copiedFrames.length === 0) return null
   const ids = new Set(nodes.map((n) => n.id))
   const edges = doc.edges.filter((e) => ids.has(e.source) && ids.has(e.target))
   const nodeTypeIds = new Set(nodes.map((n) => n.typeId))
@@ -45,6 +66,7 @@ export function copyFragment(doc: GraphDocument, nodeIds: Iterable<string>): Fra
     edgeTypes: doc.edgeTypes.filter((t) => edgeTypeIds.has(t.id)),
     nodes,
     edges,
+    frames: copiedFrames,
   }
 }
 
@@ -75,13 +97,14 @@ export function parseFragment(text: string): FragmentParse {
     ...raw,
     kind: undefined, // left out by JSON.stringify
     meta: { name: '', created: '', modified: '' },
-    // Only there so the wrapper is a whole document (the v3 → v4 migration keeps it as it is).
+    // Only there so the wrapper is a whole document (the v3 → v4 migration keeps it as it is;
+    // fragments older than v5 get their empty `frames` from the v4 → v5 migration).
     layout: { direction: 'down', spacing: 250, tiers: [] },
     view: { viewport: { x: 0, y: 0, zoom: 1 } },
   }
   const parsed = parseDocument(JSON.stringify(wrapped))
   if (!parsed.ok) return { kind: 'invalid', errors: parsed.errors }
-  const { nodeTypes, edgeTypes, nodes, edges } = parsed.doc
+  const { nodeTypes, edgeTypes, nodes, edges, frames } = parsed.doc
   return {
     kind: 'ok',
     fragment: {
@@ -91,6 +114,7 @@ export function parseFragment(text: string): FragmentParse {
       edgeTypes,
       nodes,
       edges,
+      frames,
     },
   }
 }
@@ -99,10 +123,12 @@ export interface PasteResult {
   doc: GraphDocument
   /** Ids of the pasted nodes, in fragment order. */
   nodeIds: string[]
+  /** Ids of the pasted frames, in fragment order. */
+  frameIds: string[]
 }
 
 /**
- * Adds a fragment's nodes and edges with new ids, moved by `offset` (D5). Types are matched by id:
+ * Adds a fragment's nodes, edges and frames with new ids, moved by `offset` (D5). Types are matched by id:
  * a missing type is added; one the document has is used as it is. A tier is kept only if the
  * document has it. An edge the document's own types don't allow (e.g. a named handle used against
  * its direction) is left out, so the result always loads; a type no pasted node or edge uses isn't
@@ -154,5 +180,11 @@ export function pasteFragment(
     ],
     edges: edges.length > 0 ? [...doc.edges, ...edges] : doc.edges,
   }
-  return { doc: next, nodeIds: nodes.map((n) => n.id) }
+  const frames = fragment.frames.map((f) => ({
+    ...f,
+    id: newFrameId(),
+    position: { x: f.position.x + offset.x, y: f.position.y + offset.y },
+  }))
+  if (frames.length > 0) next = { ...next, frames: [...doc.frames, ...frames] }
+  return { doc: next, nodeIds: nodes.map((n) => n.id), frameIds: frames.map((f) => f.id) }
 }

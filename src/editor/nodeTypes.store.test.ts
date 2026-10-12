@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { FlowNode } from './flowAdapter'
 import { activeNodeTypeId, useEditorStore } from './store'
 
 const store = useEditorStore
@@ -66,7 +67,7 @@ describe('node type actions', () => {
 
     s().setNodeField(s().doc.nodes[0]!.id, 'cost', 7)
     expect(s().renameFieldKey('era', 'cost', 'price')).toBeNull()
-    expect(s().flowNodes[0]!.data.values).toMatchObject({ price: 7 })
+    expect((s().flowNodes[0] as FlowNode).data.values).toMatchObject({ price: 7 })
 
     s().removeField('era', 'price')
     expect(era().fields.map((f) => f.key)).toEqual(['title'])

@@ -11,7 +11,14 @@ import {
   addTier,
   connect,
   connectionError,
+  addFrame,
   copyFragment,
+  frameAround,
+  frameContents,
+  removeFrames,
+  updateFrame,
+  type Box,
+  type FramePatch,
   createEdgeType,
   createEmptyDocument,
   createNodeType,
@@ -63,6 +70,7 @@ import {
   type NodeTypePatch,
   type TypeOpResult,
   type GraphDocument,
+  type GraphNode,
   type LayoutDirection,
   type TreeProblem,
   type PlayState,
@@ -72,12 +80,14 @@ import {
 } from '../model'
 import {
   emptyUi,
+  frameIdOf,
   reduceEdgeChanges,
   reduceNodeChanges,
   SIDE_HANDLE_IDS,
   toFlowNodes,
   uiForLoadedDocument,
-  type FlowNode,
+  type CanvasNode,
+  type FrameCarry,
   type Size,
   type UiState,
 } from './flowAdapter'
@@ -97,7 +107,7 @@ interface EditorState {
   savedDoc: GraphDocument
   ui: UiState
   /** React Flow nodes derived from `doc` + `ui`; kept here so unchanged nodes keep their identity. */
-  flowNodes: FlowNode[]
+  flowNodes: CanvasNode[]
   /**
    * The edge type picked for new connections (editor-only, D11). It may name a type that no longer
    * exists; read it through `activeEdgeTypeId(state)`, which falls back to the first type.
@@ -153,12 +163,19 @@ interface EditorState {
   duplicateSelection: () => void
   /** Selects every node (not mid-drag). */
   selectAll: () => void
+  /**
+   * Adds a frame (D8) around the selected nodes, or with `fallback`'s box when none are selected,
+   * and selects it. Returns its id; null in play mode.
+   */
+  addFrame: (fallback: Box) => string | null
+  /** Changes a frame's title, note or colour (one undo step while typing in the same box). */
+  updateFrame: (frameId: string, patch: FramePatch) => void
   /** Undoes the newest step (not in play mode). */
   undo: () => void
   /** Redoes the most recently undone step (not in play mode). */
   redo: () => void
   /** A drag (of nodes, or of the selection box) starts: its moves become one undo step. */
-  startDrag: () => void
+  startDrag: (flowIds?: readonly string[]) => void
   /**
    * Ends a drag's undo step if it is still open. Drags end in `dropNodes`; this is the backstop for
    * a drag React Flow abandons without calling its stop callback.
@@ -278,7 +295,7 @@ export interface SearchState {
 }
 
 export type PasteOutcome =
-  | { kind: 'pasted'; nodeIds: string[] }
+  | { kind: 'pasted'; nodeIds: string[]; frameIds: string[] }
   | { kind: 'nothing' }
   | { kind: 'invalid'; errors: string[] }
 
@@ -323,6 +340,11 @@ function nodeSize(doc: GraphDocument, ui: UiState, node: GraphDocument['nodes'][
   const type = doc.nodeTypes.find((t) => t.id === node.typeId)
   const width = type ? resolveNodeStyle(type.style, node.styleOverrides).width : 200
   return { width, height: 60 }
+}
+
+/** The selected frames and how to size nodes, for copying (frames carry what is inside them). */
+function frameCopy(s: Pick<EditorState, 'doc' | 'ui'>) {
+  return { ids: s.ui.selectedFrameIds, sizeOf: (n: GraphNode) => nodeSize(s.doc, s.ui, n) }
 }
 
 /** The boxes of the given nodes (positions and sizes as `nodeSize` gives them), in flow units. */
@@ -512,7 +534,12 @@ function pruneExpanded(
  * turns dragging and the Delete key off.)
  */
 function playSafe<C extends NodeChange | EdgeChange>(playing: boolean, changes: C[]): C[] {
-  return playing ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions') : changes
+  // Measurements still arrive while playing; a frame resize (`resizing`) is an edit.
+  return playing
+    ? changes.filter(
+        (c) => c.type === 'select' || (c.type === 'dimensions' && !('resizing' in c && c.resizing)),
+      )
+    : changes
 }
 
 /** Selecting something on the canvas closes a type opened from the Library. */
@@ -520,7 +547,8 @@ function closeEditingOnSelect(
   editing: Editing | null,
   ui: UiState,
 ): Partial<Pick<EditorState, 'editing'>> {
-  return editing && (ui.selectedNodeIds.size > 0 || ui.selectedEdgeIds.size > 0)
+  return editing &&
+    (ui.selectedNodeIds.size > 0 || ui.selectedEdgeIds.size > 0 || ui.selectedFrameIds.size > 0)
     ? { editing: null }
     : {}
 }
@@ -546,7 +574,12 @@ function toEnds(doc: GraphDocument, c: Connection | Edge, typeId: string): EdgeE
 /** Opens a type in the inspector and clears the canvas selection, or closes it with null. */
 function openType(s: EditorState, editing: Editing | null): Partial<EditorState> {
   if (!editing) return { editing: null }
-  const ui = { ...s.ui, selectedNodeIds: new Set<string>(), selectedEdgeIds: new Set<string>() }
+  const ui = {
+    ...s.ui,
+    selectedNodeIds: new Set<string>(),
+    selectedEdgeIds: new Set<string>(),
+    selectedFrameIds: new Set<string>(),
+  }
   return { ...derive(s, s.doc, ui), editing }
 }
 
@@ -559,6 +592,8 @@ const initialDoc = createEmptyDocument()
 let changeGroup: string | null = null
 /** The group of the drag in progress, or null when nothing is being dragged. */
 let dragGroup: string | null = null
+/** What the frames being dragged carry along (D8), decided when the drag starts. */
+let frameCarry: FrameCarry = new Map()
 let drags = 0
 /** The group of the removals being made right now (see `removalGroup`). */
 let removal: string | null = null
@@ -623,17 +658,20 @@ function restore(s: EditorState, doc: GraphDocument): Partial<EditorState> {
     [...ids].every((id) => known.has(id)) ? ids : new Set([...ids].filter((id) => known.has(id)))
   const selectedNodeIds = keep(s.ui.selectedNodeIds, nodeIds)
   const selectedEdgeIds = keep(s.ui.selectedEdgeIds, edgeIds)
+  const selectedFrameIds = keep(s.ui.selectedFrameIds, new Set(doc.frames.map((f) => f.id)))
   const ui =
-    selectedNodeIds === s.ui.selectedNodeIds && selectedEdgeIds === s.ui.selectedEdgeIds
+    selectedNodeIds === s.ui.selectedNodeIds &&
+    selectedEdgeIds === s.ui.selectedEdgeIds &&
+    selectedFrameIds === s.ui.selectedFrameIds
       ? s.ui
-      : { ...s.ui, selectedNodeIds, selectedEdgeIds }
+      : { ...s.ui, selectedNodeIds, selectedEdgeIds, selectedFrameIds }
   const types = s.editing?.kind === 'nodeType' ? doc.nodeTypes : doc.edgeTypes
   const editing = s.editing && types.some((t) => t.id === s.editing!.id) ? s.editing : null
   const expandedNodeIds = keep(s.expandedNodeIds, nodeIds)
   return { ...derive(s, doc, ui), editing, expandedNodeIds }
 }
 
-/** The document with a fragment pasted `times` offsets away, the pasted nodes selected. */
+/** The document with a fragment pasted `times` offsets away, the pasted nodes and frames selected. */
 function pasted(s: EditorState, fragment: Fragment, times: number): Partial<EditorState> {
   const d = PASTE_OFFSET * times
   const result = pasteFragment(s.doc, fragment, { x: d, y: d })
@@ -641,6 +679,7 @@ function pasted(s: EditorState, fragment: Fragment, times: number): Partial<Edit
     ...s.ui,
     selectedNodeIds: new Set(result.nodeIds),
     selectedEdgeIds: new Set<string>(),
+    selectedFrameIds: new Set(result.frameIds),
   }
   return { ...derive(s, result.doc, ui), editing: null }
 }
@@ -648,6 +687,7 @@ function pasted(s: EditorState, fragment: Fragment, times: number): Partial<Edit
 /** The state after opening a document (Load, New, autosave recovery): saved, no history. */
 function loaded(s: EditorState, doc: GraphDocument): Partial<EditorState> {
   dragGroup = null
+  frameCarry = new Map()
   const ui = uiForLoadedDocument(doc, s.doc, s.ui)
   return {
     doc,
@@ -707,11 +747,26 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
         const step = s.playing || dragGroup !== null ? null : redo(s.history, s.doc)
         return step ? { ...restore(s, step.doc), history: step.history } : s
       }),
-    startDrag: () => {
+    startDrag: (flowIds = []) => {
       dragGroup = `drag:${++drags}`
+      // A dragged frame carries the nodes whose centre is inside it and the frames inside it,
+      // as they are now (D8).
+      const s = get()
+      const carry = new Map<string, { nodeIds: string[]; frameIds: string[] }>()
+      for (const flowId of flowIds) {
+        const frameId = frameIdOf(flowId)
+        if (frameId !== null) {
+          carry.set(
+            frameId,
+            frameContents(s.doc, frameId, (n) => nodeSize(s.doc, s.ui, n)),
+          )
+        }
+      }
+      frameCarry = carry
     },
     endDrag: () => {
       dragGroup = null
+      frameCarry = new Map()
     },
     endUndoGroup: () =>
       set((s) => (s.history.group === null ? s : { history: endGroup(s.history) })),
@@ -728,7 +783,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       // step too.
       inGroup(changesGroup(changes), () =>
         set((s) => {
-          const next = reduceNodeChanges(s.doc, s.ui, playSafe(s.playing, changes))
+          const next = reduceNodeChanges(s.doc, s.ui, playSafe(s.playing, changes), frameCarry)
           return {
             ...derive(s, next.doc, next.ui),
             ...closeEditingOnSelect(s.editing, next.ui),
@@ -790,6 +845,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
           ...s.ui,
           selectedNodeIds: new Set(nodeIds.filter((id) => known.has(id))),
           selectedEdgeIds: new Set<string>(),
+          selectedFrameIds: new Set<string>(),
         }
         // A new selection also ends the newest undo step's group (D2).
         return { ...derive(s, s.doc, ui), editing: null, history: endGroup(s.history) }
@@ -912,6 +968,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       // The snap joins the drag's undo step; the drag ends here.
       inGroup(dragGroup, () => {
         dragGroup = null
+        frameCarry = new Map()
         set((s) => {
           // No lanes or rings (no tiers): dropping changes nothing.
           if (s.playing || !hasTierBands(s.doc.layout)) return s
@@ -948,7 +1005,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
     copySelection: () => {
       const s = get()
       if (dragGroup !== null) return null // positions are mid-move
-      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds)
+      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds, frameCopy(s))
       if (!fragment) return null
       const text = fragmentText(fragment)
       set({ clipboard: { text, pastes: 0 } })
@@ -957,15 +1014,25 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
     cutSelection: () => {
       // Not while playing or mid-drag (the dragged nodes would vanish under the pointer).
       if (get().playing || dragGroup !== null) return null
+      const s0 = get()
+      const fragment = copyFragment(s0.doc, s0.ui.selectedNodeIds, frameCopy(s0))
       const text = get().copySelection()
-      if (text === null) return null
+      if (text === null || !fragment) return null
       set((s) => {
-        // Like the Delete key: selected edges go too.
-        const doc = deleteNodes(deleteEdges(s.doc, s.ui.selectedEdgeIds), s.ui.selectedNodeIds)
+        // Everything copied goes (incl. what was inside cut frames); like the Delete key, selected
+        // edges go too.
+        const doc = removeFrames(
+          deleteNodes(
+            deleteEdges(s.doc, s.ui.selectedEdgeIds),
+            fragment.nodes.map((n) => n.id),
+          ),
+          fragment.frames.map((f) => f.id),
+        )
         const ui = {
           ...s.ui,
           selectedNodeIds: new Set<string>(),
           selectedEdgeIds: new Set<string>(),
+          selectedFrameIds: new Set<string>(),
         }
         return { ...derive(s, doc, ui), ...pruneExpanded(s.expandedNodeIds, s.doc, doc) }
       })
@@ -979,17 +1046,43 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       const parsed = parseFragment(source)
       if (parsed.kind === 'not-fragment') return { kind: 'nothing' }
       if (parsed.kind === 'invalid') return parsed
-      if (parsed.fragment.nodes.length === 0) return { kind: 'nothing' }
+      const { fragment } = parsed
+      if (fragment.nodes.length === 0 && fragment.frames.length === 0) return { kind: 'nothing' }
       const pastes = s.clipboard?.text === source ? s.clipboard.pastes + 1 : 1
-      set((s) => ({ ...pasted(s, parsed.fragment, pastes), clipboard: { text: source, pastes } }))
-      return { kind: 'pasted', nodeIds: [...get().ui.selectedNodeIds] }
+      set((s) => ({ ...pasted(s, fragment, pastes), clipboard: { text: source, pastes } }))
+      const { ui } = get()
+      return {
+        kind: 'pasted',
+        nodeIds: [...ui.selectedNodeIds],
+        frameIds: [...ui.selectedFrameIds],
+      }
     },
     duplicateSelection: () => {
       const s = get()
       if (s.playing || dragGroup !== null) return
-      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds)
+      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds, frameCopy(s))
       if (fragment) set((s) => pasted(s, fragment, 1))
     },
+    addFrame: (fallback) => {
+      const s = get()
+      if (s.playing) return null
+      const box = frameAround(selectNodeBoxes(s, [...s.ui.selectedNodeIds])) ?? fallback
+      const result = addFrame(s.doc, box)
+      set((s) => ({
+        ...derive(s, result.doc, {
+          ...s.ui,
+          selectedNodeIds: new Set<string>(),
+          selectedEdgeIds: new Set<string>(),
+          selectedFrameIds: new Set([result.id]),
+        }),
+        editing: null,
+      }))
+      return result.id
+    },
+    updateFrame: (frameId, patch) =>
+      inGroup(`frame:${frameId}:${patchKeys(patch)}`, () =>
+        set((s) => (s.playing ? s : derive(s, updateFrame(s.doc, frameId, patch), s.ui))),
+      ),
     setSearch: (patch) => set((s) => ({ search: { ...s.search, ...patch } })),
     goToMatch: (direction) => {
       const s = get()

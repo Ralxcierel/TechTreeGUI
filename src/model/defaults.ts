@@ -39,6 +39,7 @@ export function createEmptyDocument(name = 'Untitled', now = new Date()): GraphD
     ...newDocumentTypes(),
     nodes: [],
     edges: [],
+    frames: [],
     layout: defaultLayout(),
     view: { viewport: { x: 0, y: 0, zoom: 1 } },
   }

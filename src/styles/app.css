@@ -1172,3 +1172,65 @@ body,
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* Frames (schema v5, D7 and D8 of Phase 5): a tinted rectangle behind the cards. The wrapper and
+   the body let the pointer through (pan, box-select and click cards inside); only the title strip
+   (drag, select) and the resize handles take it. */
+/* `!important`: React Flow puts an inline `pointer-events: all` on every selectable node. */
+.react-flow__node.react-flow__node-frame {
+  pointer-events: none !important;
+}
+
+.frame-node {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--frame-color, var(--accent));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--frame-color, var(--accent)) 8%, transparent);
+}
+
+.react-flow__node-frame.selected .frame-node {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.frame-node__header {
+  pointer-events: all;
+  cursor: grab;
+  padding: 6px 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--frame-color, var(--accent)) 22%, transparent);
+  border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
+}
+
+.canvas--play .frame-node__header {
+  cursor: default;
+}
+
+.frame-node__title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frame-node__note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.react-flow__node-frame .react-flow__resize-control {
+  pointer-events: all;
+}
+
+.minimap-frame {
+  opacity: 0.35;
+}
