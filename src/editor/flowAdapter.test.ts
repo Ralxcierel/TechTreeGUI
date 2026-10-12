@@ -406,3 +406,27 @@ describe('anyBoxInView', () => {
     expect(anyBoxInView([box(0, 0)], 0, 0, [0, 0, 1])).toBe(false)
   })
 })
+
+describe('toFlowEdges: search dimming', () => {
+  it('gives dimmed edges a class, but not selected ones', () => {
+    const doc = createEmptyDocument()
+    const edge = (id: string) => ({
+      id,
+      typeId: 'prereq',
+      source: 'a',
+      target: 'b',
+      sourceHandle: null,
+      targetHandle: null,
+    })
+    const flow = toFlowEdges(
+      [edge('e1'), edge('e2'), edge('e3')],
+      doc.edgeTypes,
+      new Set(['e3']), // selected
+      new Map(),
+      new Set(),
+      new Set(['e2', 'e3']),
+    )
+    // A selected edge isn't dimmed, so its selection colour stays visible.
+    expect(flow.map((e) => e.className)).toEqual([undefined, 'graph-edge--dimmed', undefined])
+  })
+})

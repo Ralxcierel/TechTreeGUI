@@ -7,6 +7,7 @@
   --accent: #38bdf8;
   --error: #f87171;
   --warning: #fbbf24;
+  --search-match: #a78bfa;
   --radius: 8px;
 
   color-scheme: dark;
@@ -297,6 +298,28 @@ body,
 .graph-node--cycle {
   outline: 2px dashed var(--warning);
   outline-offset: 4px;
+}
+
+/* Search (D6 of Phase 5): matches get a violet ring (a box-shadow, so it follows the card's shape
+   and shows with the cycle and play outlines); the rest is dimmed. The dimming is on React Flow's
+   node wrapper, so it multiplies with the play-mode opacity on the card instead of replacing it
+   (and, unlike a `filter` on the card, doesn't move the card's handles). */
+.graph-node--match {
+  box-shadow: 0 0 0 3px var(--search-match);
+}
+
+.react-flow__node.selected .graph-node--match {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px var(--search-match);
+}
+
+.react-flow__node:has(> .graph-node--dimmed) {
+  opacity: 0.3;
+}
+
+.react-flow__edge.graph-edge--dimmed {
+  opacity: 0.2;
 }
 
 .graph-node--missing {
@@ -915,6 +938,20 @@ body,
     inset 0 0 0 999px rgb(56 189 248 / 0.18);
 }
 
+/* An unlocked card that matches the search keeps both its tint and the search ring. */
+.graph-node--play-unlocked.graph-node--match {
+  box-shadow:
+    0 0 0 3px var(--search-match),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.react-flow__node.selected .graph-node--play-unlocked.graph-node--match {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px var(--search-match),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
 .graph-node--play-blocked {
   outline: 2px dashed var(--error);
   outline-offset: 4px;
@@ -1114,4 +1151,24 @@ body,
 .react-flow__controls-button.shortcut-hint {
   cursor: help;
   font-size: 14px;
+}
+
+/* The node search at the top of the Library (D6 of Phase 5). */
+.search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.search-box__query,
+.search-box__field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.search-box__count {
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--text-muted);
 }

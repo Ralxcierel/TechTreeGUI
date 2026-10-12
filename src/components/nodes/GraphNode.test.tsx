@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { ReactFlowProvider, type NodeProps } from '@xyflow/react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { FlowNode } from '../../editor/flowAdapter'
 import { useEditorStore } from '../../editor/store'
@@ -28,6 +28,39 @@ function renderNode(
 }
 
 describe('GraphNode', () => {
+  it('is outlined when it matches the search, dimmed when not, and neither without one', () => {
+    // Search reads the document's node n1 (the card's own props don't take part).
+    const doc = addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1')
+    store.getState().loadDocument(doc)
+    const card = renderNode('technology', { title: 'New Technology' })
+    expect(card.className).not.toMatch(/graph-node--(match|dimmed)/)
+    act(() => store.getState().setSearch({ query: 'technology' }))
+    expect(card.className).toContain('graph-node--match')
+    act(() => store.getState().setSearch({ query: 'zzz' }))
+    expect(card.className).toContain('graph-node--dimmed')
+    expect(card.className).not.toContain('graph-node--match')
+  })
+
+  it('tells screen readers about a match', () => {
+    store
+      .getState()
+      .loadDocument(addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'))
+    renderNode('technology', { title: 'New Technology' })
+    expect(screen.queryByText('Matches the search.')).toBeNull()
+    act(() => store.getState().setSearch({ query: 'new' }))
+    expect(screen.getByText('Matches the search.').className).toBe('visually-hidden')
+  })
+
+  it('dims a node of a missing type during a search', () => {
+    store
+      .getState()
+      .loadDocument(addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'))
+    const card = renderNode('gone', {})
+    expect(card.className).toBe('graph-node graph-node--missing')
+    act(() => store.getState().setSearch({ query: 'zzz' }))
+    expect(card.className).toBe('graph-node graph-node--missing graph-node--dimmed')
+  })
+
   it('draws the type style and its title', () => {
     const card = renderNode('technology', { title: 'Fire' })
     expect(card.className).toContain('graph-node--rounded')

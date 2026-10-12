@@ -165,6 +165,7 @@ export function toFlowEdges(
   selectedEdgeIds: ReadonlySet<string>,
   handles: HandleIdsByNode = new Map(),
   cycleEdgeIds: ReadonlySet<string> = new Set(),
+  dimmedEdgeIds: ReadonlySet<string> = new Set(),
 ): FlowEdge[] {
   const typesById = new Map(edgeTypes.map((t) => [t.id, t]))
   return edges.map((e) => {
@@ -180,6 +181,8 @@ export function toFlowEdges(
       selected,
       data: { path: style && EDGE_PATHS.has(style.path) ? style.path : 'bezier' },
     }
+    // Not between two search matches (D6 of Phase 5); a selected edge stays visible.
+    if (!selected && dimmedEdgeIds.has(e.id)) flowEdge.className = 'graph-edge--dimmed'
     if (!style) return flowEdge
 
     // Selection recolours the line and its arrowheads; markers can't be restyled from CSS.

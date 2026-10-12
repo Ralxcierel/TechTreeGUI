@@ -19,10 +19,12 @@ import {
   deleteEdgeType,
   deleteNodes,
   deleteNodeType,
+  findMatches,
   findProblems,
   fragmentText,
   resolveNodeStyle,
   moveNodes,
+  nextMatch,
   treeNodeIds,
   playStates,
   toggleUnlocked,
@@ -120,6 +122,14 @@ interface EditorState {
    * Editor-only; kept across New and Load so parts can move between documents.
    */
   clipboard: { text: string; pastes: number } | null
+  /** The node search (D6 of Phase 5): editor-only, never saved or undone, kept across New/Load. */
+  search: SearchState
+  setSearch: (patch: Partial<SearchState>) => void
+  /**
+   * Selects the next (1) or previous (-1) search match from the current selection (see
+   * `nextMatch`) and returns its id, or null without matches or mid-drag.
+   */
+  goToMatch: (direction: 1 | -1) => string | null
   /**
    * Copies the selected nodes as fragment text (also kept in-app); null with no nodes selected or
    * mid-drag.
@@ -261,6 +271,12 @@ interface EditorState {
   markSaved: (viewport: Viewport) => GraphDocument
 }
 
+export interface SearchState {
+  query: string
+  /** Limit the search to this field key, or null for all fields. */
+  fieldKey: string | null
+}
+
 export type PasteOutcome =
   | { kind: 'pasted'; nodeIds: string[] }
   | { kind: 'nothing' }
@@ -318,6 +334,50 @@ export function selectNodeBoxes(
   return s.doc.nodes
     .filter((n) => wanted.has(n.id))
     .map((n) => ({ position: n.position, size: nodeSize(s.doc, s.ui, n) }))
+}
+
+/** Cached inputs and result of `selectSearchMatches`. */
+let searchCache: {
+  nodes: GraphDocument['nodes']
+  nodeTypes: GraphDocument['nodeTypes']
+  search: SearchState
+  ids: readonly string[] | null
+  set: ReadonlySet<string> | null
+} | null = null
+
+function searchOf(s: Pick<EditorState, 'doc' | 'search'>): NonNullable<typeof searchCache> {
+  const c = searchCache
+  const { nodes, nodeTypes } = s.doc
+  if (c && c.nodes === nodes && c.nodeTypes === nodeTypes && c.search === s.search) return c
+  const ids = findMatches(s.doc, s.search.query, s.search.fieldKey)
+  // Same matches (e.g. a node was dragged): keep the old objects, so nothing re-renders.
+  const same = c !== null && (ids === null ? c.ids === null : c.ids !== null && sameIds(c.ids, ids))
+  searchCache = {
+    nodes,
+    nodeTypes,
+    search: s.search,
+    ids: same ? c.ids : ids,
+    set: same ? c.set : ids && new Set(ids),
+  }
+  return searchCache
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i])
+}
+
+/** Ids of the nodes matching the search, in document order; null when no search is active. */
+export function selectSearchMatches(
+  s: Pick<EditorState, 'doc' | 'search'>,
+): readonly string[] | null {
+  return searchOf(s).ids
+}
+
+/** The same matches as a set (memoised with `selectSearchMatches`). */
+export function selectSearchMatchSet(
+  s: Pick<EditorState, 'doc' | 'search'>,
+): ReadonlySet<string> | null {
+  return searchOf(s).set
 }
 
 /** Cached inputs and result of `selectProblems`. */
@@ -635,6 +695,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
     unlockedIds: new Set(),
     history: emptyHistory(),
     clipboard: null,
+    search: { query: '', fieldKey: null },
     undo: () =>
       set((s) => {
         // Not while playing, nor in the middle of a drag (React Flow would keep moving the nodes).
@@ -928,6 +989,20 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       if (s.playing || dragGroup !== null) return
       const fragment = copyFragment(s.doc, s.ui.selectedNodeIds)
       if (fragment) set((s) => pasted(s, fragment, 1))
+    },
+    setSearch: (patch) => set((s) => ({ search: { ...s.search, ...patch } })),
+    goToMatch: (direction) => {
+      const s = get()
+      if (dragGroup !== null) return null // a new selection would split the drag's undo step
+      const matches = selectSearchMatches(s) ?? []
+      const id = nextMatch(
+        s.doc.nodes.map((n) => n.id),
+        matches,
+        s.ui.selectedNodeIds,
+        direction,
+      )
+      if (id !== null) s.selectNodes([id])
+      return id
     },
     selectAll: () => {
       // Mid-drag, a new selection would end the drag's undo step halfway through.

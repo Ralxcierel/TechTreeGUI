@@ -14,7 +14,7 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react'
-import { selectCycleEdgeIds, useEditorStore } from '../editor/store'
+import { selectCycleEdgeIds, selectSearchMatchSet, useEditorStore } from '../editor/store'
 import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
@@ -31,9 +31,9 @@ const deleteKeys = ['Delete', 'Backspace']
 /** The keyboard shortcuts, shown as hover text on the keyboard sign in the canvas controls. */
 const SHORTCUTS_HINT =
   'Shortcuts (⌘ instead of Ctrl on macOS): Ctrl+C copy, Ctrl+X cut, Ctrl+V paste, ' +
-  'Ctrl+D duplicate, Ctrl+A select all, Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo, ' +
+  'Ctrl+D duplicate, Ctrl+A select all, Ctrl+F search, Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo, ' +
   'Delete or Backspace delete, Shift+drag box select, Ctrl+click add to selection. ' +
-  'While playing, only copy and select all work.'
+  'While playing, only copy, select all and search work.'
 
 /**
  * Clears text selected elsewhere on the page when the canvas is clicked. React Flow cancels the
@@ -74,9 +74,22 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeTypesKey covers what is read
     [nodeTypesKey, nodeTypeList],
   )
+  // With a search active, edges are dimmed unless both ends match (D6 of Phase 5).
+  const searchMatches = useEditorStore(selectSearchMatchSet)
+  const dimmedEdgeIds = useMemo(
+    () =>
+      new Set(
+        searchMatches === null
+          ? []
+          : docEdges
+              .filter((e) => !(searchMatches.has(e.source) && searchMatches.has(e.target)))
+              .map((e) => e.id),
+      ),
+    [docEdges, searchMatches],
+  )
   const edges = useMemo(
-    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds),
-    [docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds],
+    () => toFlowEdges(docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds, dimmedEdgeIds),
+    [docEdges, edgeTypeList, selectedEdgeIds, named, cycleEdgeIds, dimmedEdgeIds],
   )
   const miniMapColor = useCallback(
     (node: FlowNode) => {

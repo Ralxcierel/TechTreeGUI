@@ -10,7 +10,12 @@ import {
 } from '@xyflow/react'
 import { useEffect, useId, useState } from 'react'
 import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
-import { selectCycleNodeIds, selectPlayStates, useEditorStore } from '../../editor/store'
+import {
+  selectCycleNodeIds,
+  selectPlayStates,
+  selectSearchMatchSet,
+  useEditorStore,
+} from '../../editor/store'
 import { sideHandleIds, type FlowNode } from '../../editor/flowAdapter'
 import { knownShape, resolveNodeStyle, type PlayState } from '../../model'
 import { cardIcon } from '../../editor/images'
@@ -56,6 +61,11 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
     s.playing ? (selectPlayStates(s).get(id) ?? 'outside') : null,
   )
   const readOnly = playState !== null
+  // With a search active (D6 of Phase 5): whether this node matches; null without a search.
+  const searchMatch = useEditorStore((s) => {
+    const matches = selectSearchMatchSet(s)
+    return matches === null ? null : matches.has(id)
+  })
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -85,7 +95,16 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   if (!nodeType) {
     // Keeps the hover handlers, so a tooltip can't get stuck if the type comes back.
     return (
-      <div className="graph-node graph-node--missing" {...pointer}>
+      <div
+        className={[
+          'graph-node graph-node--missing',
+          // Never a search match: dimmed like the rest while a search is active.
+          searchMatch === false && 'graph-node--dimmed',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        {...pointer}
+      >
         Unknown type
       </div>
     )
@@ -108,6 +127,8 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
         playState
           ? `graph-node--play graph-node--play-${playState}`
           : inCycle && 'graph-node--cycle',
+        searchMatch === true && 'graph-node--match',
+        searchMatch === false && 'graph-node--dimmed',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -153,6 +174,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
         ) : (
           inCycle && <span className="visually-hidden">In a prerequisite cycle. </span>
         )}
+        {searchMatch === true && <span className="visually-hidden">Matches the search. </span>}
         {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
           // An edit on the card is one undo step of its own. (Enter removes the focused box, and
