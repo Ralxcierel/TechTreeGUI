@@ -72,6 +72,7 @@ import {
   type Size,
   type UiState,
 } from './flowAdapter'
+import { autoLayout } from './autoLayout'
 import { dropInLane, lanes, positionInTier } from './lanes'
 
 /** A type opened in the inspector from the Library (instead of the canvas selection). */
@@ -185,6 +186,11 @@ interface EditorState {
    * or loses its tier outside every lane (D9). Nothing happens without lanes or in play mode.
    */
   dropNodes: (nodeIds: readonly string[]) => void
+  /**
+   * Auto-layout (P4-5): moves the tree nodes to their laid-out positions (see `autoLayoutMoves`)
+   * and returns the ids of the nodes that moved. Nothing happens in play mode.
+   */
+  autoLayout: () => string[]
   /** Renames the document (also the save file name). */
   setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
@@ -224,7 +230,10 @@ export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'
   return types[0]?.id ?? null
 }
 
-/** A node's size for lane snapping: as measured on screen, else its type's width × 60. */
+/**
+ * A node's size for lane snapping and auto-layout: as measured on screen, else its type's
+ * width × 60.
+ */
 function nodeSize(doc: GraphDocument, ui: UiState, node: GraphDocument['nodes'][number]): Size {
   const measured = ui.measured.get(node.id)
   if (measured) return measured
@@ -245,6 +254,7 @@ let problemsCache: {
   problems: readonly TreeProblem[]
   cycleNodeIds: ReadonlySet<string>
   cycleEdgeIds: ReadonlySet<string>
+  treeIds: ReadonlySet<string>
 } | null = null
 
 /**
@@ -283,6 +293,7 @@ function problemsOf(doc: GraphDocument): NonNullable<typeof problemsCache> {
     problems,
     cycleNodeIds: new Set(cycles.flatMap((p) => p.nodeIds)),
     cycleEdgeIds: new Set(cycles.flatMap((p) => p.edgeIds)),
+    treeIds: treeNodeIds(doc),
   }
   return problemsCache
 }
@@ -300,6 +311,25 @@ export function selectCycleNodeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<str
 /** Prerequisite edges between nodes of one cycle (memoised with `selectProblems`). */
 export function selectCycleEdgeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<string> {
   return problemsOf(s.doc).cycleEdgeIds
+}
+
+/** The nodes that are part of the tech tree (D3; memoised with `selectProblems`). */
+export function selectTreeNodeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<string> {
+  return problemsOf(s.doc).treeIds
+}
+
+/**
+ * The moves auto-layout would make (P4-5): the new position of every tree node that isn't there
+ * yet. Empty in radial mode, without tree nodes, or when the tree is already laid out.
+ */
+export function autoLayoutMoves(s: Pick<EditorState, 'doc' | 'ui'>): Map<string, Position> {
+  const byId = new Map(s.doc.nodes.map((n) => [n.id, n]))
+  const moves = autoLayout(s.doc, (n) => nodeSize(s.doc, s.ui, n))
+  for (const [id, to] of moves) {
+    const from = byId.get(id)!.position
+    if (from.x === to.x && from.y === to.y) moves.delete(id)
+  }
+  return moves
 }
 
 /** Cached inputs and result of `selectPlayStates`. */
@@ -582,6 +612,13 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         if (moves.size > 0) doc = moveNodes(doc, moves)
         return derive(s, doc, s.ui)
       }),
+    autoLayout: () => {
+      const s = get()
+      if (s.playing) return [] // the document is read-only in play mode
+      const moves = autoLayoutMoves(s)
+      if (moves.size > 0) set((s) => derive(s, moveNodes(s.doc, moves), s.ui))
+      return [...moves.keys()]
+    },
     setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
     loadDocument: (doc) =>
       set((s) => {

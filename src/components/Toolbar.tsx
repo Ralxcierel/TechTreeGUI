@@ -4,6 +4,7 @@ import { activeNodeTypeId, useEditorStore } from '../editor/store'
 import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
 import { parseDocument, serialize } from '../model'
+import { AutoLayoutButton } from './AutoLayoutButton'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
 import { PlayBar } from './PlayBar'
 
@@ -99,6 +100,7 @@ export function Toolbar() {
         <button onClick={handleAdd} disabled={playing}>
           Add node
         </button>
+        <AutoLayoutButton />
         <button onClick={handleSave}>Save</button>
         <button onClick={handleLoadClick}>Load</button>
         <input
