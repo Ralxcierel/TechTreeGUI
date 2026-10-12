@@ -2,14 +2,15 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (2026-10-12, at the Phase 4 gate)
+## Resume here (2026-10-12, DESIGN Phase 5 plan drafted, waiting for approval)
 1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (694 tests at hand-off).
-2. **Waiting on the developer: approval of the Phase 4 gate (P4-7, commit `2fc7e1c`), which closes DESIGN Phase 4.** P4-0 to P4-6 are approved (P4-6 on 2026-10-12).
-3. After approval: the next phase is **DESIGN Phase 5 — Quality of life** (`docs/DESIGN.md` §5: undo/redo; multi-select, copy/paste, duplicate; group frames / annotations; search and filter by field values; export PNG/SVG and a "game export" JSON; autosave to browser storage with recovery). Per the global workflow: Phase 0 restatement and questions, then a Phase 1-style walking-skeleton plan in `docs/PLAN-phase5.md` with [DECISION]/[ASSUMPTION]/[QUESTION], and stop for approval before any code. Likely decisions to flag: an undo design (whole-document snapshots vs. commands), whether image export needs a new dependency (e.g. html-to-image), the game-export format, and autosave storage and recovery UX.
-4. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
-5. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
-6. Shell gotchas: in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script (hit again 2026-10-10); a long heredoc also failed with "unexpected EOF". Never start a Bash command with a bare `cat > file` before a heredoc meant for another program: it waits for input forever (2026-10-11). For bigger edits write a Python script to the scratchpad with the Write tool and run it with `python -I <path>`; use the Edit tool for lines with escapes.
-7. Browser pane (2026-10-10, what worked):
+2. **DESIGN Phase 4 is complete and approved (2026-10-12).**
+3. **Waiting on the developer: approval of `docs/PLAN-phase5.md`** (Phase 5, quality of life: D1–D12, assumptions, Q1–Q6). D9 adds a new dependency (`html-to-image` 1.11.11) and D7 a schema change (v5 `frames`); both need explicit confirmation. No Phase 5 code has been written.
+4. After approval: build **P5-0 (skeleton: undo/redo)**. Restate it first, flag new decisions, build, test, self-review, independent review loop (max 3 rounds), stop at the gate, push.
+5. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
+6. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
+7. Shell gotchas: in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script (hit again 2026-10-10); a long heredoc also failed with "unexpected EOF". Never start a Bash command with a bare `cat > file` before a heredoc meant for another program: it waits for input forever (2026-10-11). For bigger edits write a Python script to the scratchpad with the Write tool and run it with `python -I <path>`; use the Edit tool for lines with escapes.
+8. Browser pane (2026-10-10, what worked):
    - `resize_window` to 1280×720, then take a full screenshot (`computer` screenshot, retry if it times out) right before clicking: input coordinates = page coordinates ÷ 1.6 (frame 800×450). Compute targets with `getBoundingClientRect` in JavaScript. Screenshots may look shrunk into a corner or cropped; the ÷ 1.6 input mapping still held after a fresh screenshot.
    - Clicking by `ref` was unreliable (it hit the wrong button once). Drags sometimes panned instead of moving nodes, and nodes under the minimap can't be grabbed.
    - To set up a graph quickly, import the app's own store in the page: find the exact module URL with `performance.getEntriesByType('resource')` (it has a `?t=` suffix; a different URL gives a separate store copy), then `const { useEditorStore } = await import(url)` and call its actions. Then verify with real clicks, drags and keys.
@@ -18,15 +19,16 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
    - 2026-10-11: with no emulation the pane was only 402 px wide, and the canvas then has zero width (so fit/visibility can't be checked there); 1280×720 emulation with the ÷ 1.6 mapping worked again.
 
 ## Where we are
-- **DESIGN Phase 4 (tech-tree features): P4-0 to P4-6 approved; the P4-7 gate is built, waiting for approval.** `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
+- **DESIGN Phase 5 (quality of life): plan drafted in `docs/PLAN-phase5.md`, waiting for approval.**
+- **DESIGN Phase 4 (tech-tree features) is complete and approved** (2026-10-12). `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
   - Skeleton P4-0: cycle detection on prerequisite edges → Problems panel → marked cards (no schema change).
   - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
 - **DESIGN Phase 3 is complete and approved** (2026-10-09). Plan `docs/PLAN-phase3.md`; all of P3-0 to P3-5 approved. The developer chose to keep the "no generic side dot under a centred named handle" behaviour from P3-4.
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
-## Done (DESIGN Phase 4, at the gate)
-- **P4-7 Phase 4 gate** (commit `2fc7e1c`, waiting for approval):
+## Done (DESIGN Phase 4, complete)
+- **P4-7 Phase 4 gate** (commit `2fc7e1c`, approved 2026-10-12):
   - `src/editor/phase4.acceptance.test.ts` automates `docs/PLAN-phase4.md` §1 through store actions: a 14-node tree plus a note, with a cycle (Alchemy ⇄ Chemistry) and an orphan (Sailing). (1) Exact problem texts, cycle nodes and the exact cycle edge set; deleting the closing edge leaves only the orphan and no marks. (2) Play: every node's starting state (5 roots available, the rest locked, the note outside), the AND rule, cost totals, a two-level re-lock cascade (Fire → Bronze → Iron), unlocked set {Wheel}; leaving play keeps the same document. (3) Lanes, a drop snapping Bronze into Classical, the inspector tier pick moving Iron. (4) Down and right: every node at the middle of the lane of its D11 rank, tiered nodes in their lanes, no overlaps, the note unmoved; radial: rank 0 inside the centre disc, rank k within 1 unit of k × spacing, tiered nodes on their rings, every node's angle as slices sized by leaves predict (Writing's branch has 2 leaves → 120°). (5) Save → reset → load: deep-equal and byte-identical, layout, tiers and assignments included.
   - Independent review of the test: no bugs, but 5 regressions it wouldn't have caught (cycle edge set, unchecked starting states, one-level cascade, layer positions, slice sizing with all-equal leaves). All tightened; the equal-slices mutation is now caught (checked). Nits applied: width read from the type, angles normalised, exact ring radii, no implementation constant in the test, ids cleared per test.
   - **Hand check in the browser (1280×720 emulation), real mouse and keyboard except where noted:**
@@ -308,9 +310,12 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - **Dev-server note:** twice, Vite kept serving a stale or empty module after a file was rewritten by a script. Restarting `npm run dev` fixed it both times. If the app reports missing exports or lacks a just-added feature, restart the dev server.
 
 ## Open items
+### Phase 5 (plan draft, `docs/PLAN-phase5.md`)
+- **Waiting:** approval of the plan. Open: D1–D12 (incl. **D9 new dependency `html-to-image` 1.11.11** and **D7 schema v5 `frames`**), the assumptions in §5, and Q1 (positions in the game export), Q2 (lanes/rings in pictures), Q3 (defaults filled into game-export data), Q4 (Ctrl+F), Q5 (annotations = frames + Note nodes), Q6 (copy/paste frames).
+
 ### Phase 4
 - Plan approved 2026-10-10 (all recommended). The decisions D1–D12, assumptions and Q1–Q5 answers are in `docs/PLAN-phase4.md` §4–6.
-- **Waiting:** developer approval of the Phase 4 gate (P4-7).
+- Phase 4 gate approved 2026-10-12.
 - Note for the developer: with the default spacing 250 and 220 px cards, radial layouts with several roots overlap near the centre; spacing ~500 avoids it (accepted limitation of P4-6, could be a later improvement).
 - **[DECISION]** (P4-6, approved 2026-10-11) A–F above under P4-6 (centre ring size and cap, overlaps accepted, own branches clockwise from 12 o'clock, centre disc snapping, ring names at 12 o'clock, 12 o'clock fallback).
 - **[DECISION]** (P4-5, approved 2026-10-11) A–F above under P4-5 (loop edges ignored, `tierId` never changed, disabled states, 40/80 px gaps, oversize nodes may overlap the next layer, no question when nothing moves).
