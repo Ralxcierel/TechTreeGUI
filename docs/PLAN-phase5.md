@@ -1,7 +1,11 @@
 # Plan — DESIGN Phase 5: quality of life
 
-> Status: **draft, waiting for the developer's approval** (decisions D1–D12, assumptions, Q1–Q6).
-> Scope source: `docs/DESIGN.md` §5 Phase 5. Progress is tracked in `PROGRESS.md`.
+> Status: **approved by the developer (2026-10-12): "recommended for all"**: D1–D12 (including
+> the new dependency `html-to-image` 1.11.11, D9, and schema v5 `frames`, D7), the assumptions,
+> and the recommended answers to Q1–Q6 (Q1 positions in the game export: yes; Q2 lanes/rings in
+> pictures: not yet; Q3 defaults filled in: yes; Q4 Ctrl+F to the app's search: yes; Q5 frames +
+> Note nodes are enough: yes; Q6 frames copy/paste with their nodes: yes). Scope source:
+> `docs/DESIGN.md` §5 Phase 5. Progress is tracked in `PROGRESS.md`.
 
 ## 0. Restatement
 
