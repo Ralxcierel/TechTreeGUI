@@ -1109,3 +1109,9 @@ body,
   border-radius: 4px;
   white-space: nowrap;
 }
+
+/* The keyboard sign in the canvas controls: hover text only, not a button. */
+.react-flow__controls-button.shortcut-hint {
+  cursor: help;
+  font-size: 14px;
+}

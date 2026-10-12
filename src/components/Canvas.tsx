@@ -6,7 +6,14 @@ import {
   MiniMap,
   ReactFlow,
 } from '@xyflow/react'
-import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react'
 import { selectCycleEdgeIds, useEditorStore } from '../editor/store'
 import { handleIdsByNode, toFlowEdges, type FlowNode } from '../editor/flowAdapter'
 import { resolveNodeStyle } from '../model'
@@ -14,11 +21,30 @@ import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
 import { TierLanes } from './TierLanes'
 import { TierRings } from './TierRings'
+import { isTextEntry } from './useShortcuts'
 
 // Defined outside the component so React Flow sees the same object on every render.
 const nodeTypes = { graph: GraphNode }
 const edgeTypes = { graph: GraphEdge }
 const deleteKeys = ['Delete', 'Backspace']
+
+/** The keyboard shortcuts, shown as hover text on the keyboard sign in the canvas controls. */
+const SHORTCUTS_HINT =
+  'Shortcuts (⌘ instead of Ctrl on macOS): Ctrl+C copy, Ctrl+X cut, Ctrl+V paste, ' +
+  'Ctrl+D duplicate, Ctrl+A select all, Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo, ' +
+  'Delete or Backspace delete, Shift+drag box select, Ctrl+click add to selection. ' +
+  'While playing, only copy and select all work.'
+
+/**
+ * Clears text selected elsewhere on the page when the canvas is clicked. React Flow cancels the
+ * browser's own mouse-down handling, which would normally clear it, and a leftover text selection
+ * would take Ctrl+C away from the selected nodes (see `useClipboard`).
+ */
+function clearPageTextSelection(e: PointerEvent<HTMLDivElement>) {
+  if (isTextEntry(e.target)) return
+  const selection = window.getSelection()
+  if (selection && !selection.isCollapsed) selection.removeAllRanges()
+}
 
 export function Canvas() {
   const nodes = useEditorStore((s) => s.flowNodes)
@@ -84,7 +110,7 @@ export function Canvas() {
     .join(' ')
 
   return (
-    <div className={className} onKeyDown={onPlayKeyDown}>
+    <div className={className} onKeyDown={onPlayKeyDown} onPointerDown={clearPageTextSelection}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -119,7 +145,16 @@ export function Canvas() {
         <TierRings />
         {/* No lock button while playing: it writes straight into React Flow's own settings and
             could turn dragging back on. */}
-        <Controls showInteractive={!playing} />
+        <Controls showInteractive={!playing}>
+          <span
+            className="react-flow__controls-button shortcut-hint"
+            role="img"
+            aria-label={SHORTCUTS_HINT}
+            title={SHORTCUTS_HINT}
+          >
+            ⌨
+          </span>
+        </Controls>
         <MiniMap nodeColor={miniMapColor} pannable zoomable />
       </ReactFlow>
     </div>

@@ -1,5 +1,7 @@
-// The app's keyboard shortcuts (D3 of Phase 5): Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo (⌘ on
-// macOS). While the focus is in a text box, the keys belong to that box (its own text undo).
+// The app's keyboard shortcuts (D3 of Phase 5): Ctrl+Z undo, Ctrl+Shift+Z or Ctrl+Y redo, Ctrl+D
+// duplicate, Ctrl+A select all nodes (⌘ on macOS). While the focus is in a text box, the keys
+// belong to that box (its own text undo, select all). Copy, cut and paste use the browser's own
+// clipboard events instead (see `useClipboard`).
 //
 // React note: `useEffect` runs after the component appears on screen. Here it adds one key
 // listener to the whole window, and the function it returns removes the listener again when the
@@ -26,7 +28,7 @@ export function isTextEntry(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type)
 }
 
-export type Shortcut = 'undo' | 'redo'
+export type Shortcut = 'undo' | 'redo' | 'duplicate' | 'selectAll'
 
 /** The app shortcut a key press means, or null. */
 export function shortcutFor(
@@ -39,6 +41,8 @@ export function shortcutFor(
     : e.code.replace(/^Key/, '').toLowerCase()
   if (key === 'z') return e.shiftKey ? 'redo' : 'undo'
   if (key === 'y' && !e.shiftKey) return 'redo'
+  if (key === 'd' && !e.shiftKey) return 'duplicate'
+  if (key === 'a' && !e.shiftKey) return 'selectAll'
   return null
 }
 
@@ -50,7 +54,15 @@ export function useShortcuts(): void {
       e.preventDefault()
       const state = useEditorStore.getState()
       if (shortcut === 'undo') state.undo()
-      else state.redo()
+      else if (shortcut === 'redo') state.redo()
+      else if (shortcut === 'duplicate') {
+        // Holding the keys would stack a copy (and an undo step) per key repeat.
+        if (!e.repeat) state.duplicateSelection()
+      } else {
+        // Page text selected earlier would otherwise keep Ctrl+C (see `useClipboard`).
+        window.getSelection()?.removeAllRanges()
+        state.selectAll()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

@@ -43,6 +43,13 @@ describe('shortcutFor', () => {
     expect(press('Z', { ctrlKey: true, shiftKey: true })).toBe('redo')
     expect(press('y', { ctrlKey: true })).toBe('redo')
   })
+  it('knows duplicate and select all', () => {
+    expect(press('d', { ctrlKey: true })).toBe('duplicate')
+    expect(press('a', { metaKey: true })).toBe('selectAll')
+    expect(press('в', { code: 'KeyD', ctrlKey: true })).toBe('duplicate')
+    expect(press('D', { ctrlKey: true, shiftKey: true })).toBeNull()
+    expect(press('A', { ctrlKey: true, shiftKey: true })).toBeNull()
+  })
   it('finds Z and Y by key position on other alphabets', () => {
     expect(press('я', { code: 'KeyZ', ctrlKey: true })).toBe('undo')
     expect(press('н', { code: 'KeyY', ctrlKey: true })).toBe('redo')
@@ -94,6 +101,35 @@ describe('useShortcuts', () => {
     key(getByLabelText('flag'), { key: 'z', ctrlKey: true })
     key(getByLabelText('kind'), { key: 'z', ctrlKey: true })
     expect(s().doc.nodes).toHaveLength(0)
+  })
+
+  it('duplicates with Ctrl+D and selects all with Ctrl+A, but not in text boxes', () => {
+    const { getByLabelText } = render(<App />)
+    s().addNode('technology', { x: 0, y: 0 })
+    s().addNode('technology', { x: 0, y: 0 })
+    expect(key(getByLabelText('name'), { key: 'a', ctrlKey: true })).toBe(true) // the box's own
+    expect(s().ui.selectedNodeIds.size).toBe(0)
+    expect(key(document.body, { key: 'a', ctrlKey: true })).toBe(false)
+    expect(s().ui.selectedNodeIds.size).toBe(2)
+    key(getByLabelText('notes'), { key: 'd', ctrlKey: true })
+    expect(s().doc.nodes).toHaveLength(2)
+    expect(key(document.body, { key: 'd', ctrlKey: true })).toBe(false) // no bookmark dialog
+    expect(s().doc.nodes).toHaveLength(4)
+    // Holding the keys duplicates once.
+    expect(key(document.body, { key: 'd', ctrlKey: true, repeat: true })).toBe(false)
+    expect(s().doc.nodes).toHaveLength(4)
+  })
+
+  it('Ctrl+A clears page text selected earlier, so Ctrl+C copies the nodes', () => {
+    const { getByText } = render(
+      <>
+        <App />
+        <p>Some text</p>
+      </>,
+    )
+    window.getSelection()!.selectAllChildren(getByText('Some text'))
+    key(document.body, { key: 'a', ctrlKey: true })
+    expect(window.getSelection()!.isCollapsed).toBe(true)
   })
 
   it('stops listening when the app goes away', () => {

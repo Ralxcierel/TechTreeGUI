@@ -11,12 +11,16 @@ import {
   addTier,
   connect,
   connectionError,
+  copyFragment,
   createEdgeType,
   createEmptyDocument,
   createNodeType,
+  deleteEdges,
   deleteEdgeType,
+  deleteNodes,
   deleteNodeType,
   findProblems,
+  fragmentText,
   resolveNodeStyle,
   moveNodes,
   treeNodeIds,
@@ -26,6 +30,8 @@ import {
   moveHandle,
   moveTier,
   orientEnds,
+  parseFragment,
+  pasteFragment,
   removeField,
   removeHandle,
   removeNodeData,
@@ -49,6 +55,7 @@ import {
   withModified,
   type EdgeEnds,
   type EdgeTypePatch,
+  type Fragment,
   type FieldPatch,
   type HandlePatch,
   type NodeTypePatch,
@@ -106,6 +113,36 @@ interface EditorState {
   unlockedIds: ReadonlySet<string>
   /** Undo/redo stacks of document snapshots (P5-0); cleared on New and Load. */
   history: History
+  /**
+   * The in-app copy of the last copied or pasted fragment text (D4 of Phase 5), used when a paste
+   * brings no text, and how many times it was pasted (each paste lands one offset further; undo
+   * doesn't count a paste back).
+   * Editor-only; kept across New and Load so parts can move between documents.
+   */
+  clipboard: { text: string; pastes: number } | null
+  /**
+   * Copies the selected nodes as fragment text (also kept in-app); null with no nodes selected or
+   * mid-drag.
+   */
+  copySelection: () => string | null
+  /**
+   * Copy, then delete the selected nodes and edges as one undo step. Null (and nothing) in play
+   * mode or mid-drag.
+   */
+  cutSelection: () => string | null
+  /**
+   * Pastes fragment text (or, with none, the in-app copy) as one undo step and selects the pasted
+   * nodes. Text that isn't a fragment, or a fragment without nodes, pastes nothing. Nothing in
+   * play mode or mid-drag.
+   */
+  paste: (text?: string | null) => PasteOutcome
+  /**
+   * Copies the selected nodes next to the originals (one undo step) and selects the copies. Not in
+   * play mode or mid-drag.
+   */
+  duplicateSelection: () => void
+  /** Selects every node (not mid-drag). */
+  selectAll: () => void
   /** Undoes the newest step (not in play mode). */
   undo: () => void
   /** Redoes the most recently undone step (not in play mode). */
@@ -223,6 +260,14 @@ interface EditorState {
   /** Records the current viewport, stamps `meta.modified`, and returns the document to write. */
   markSaved: (viewport: Viewport) => GraphDocument
 }
+
+export type PasteOutcome =
+  | { kind: 'pasted'; nodeIds: string[] }
+  | { kind: 'nothing' }
+  | { kind: 'invalid'; errors: string[] }
+
+/** How far each paste or duplicate lands from the copied nodes (D5 of Phase 5), in flow units. */
+export const PASTE_OFFSET = 40
 
 /** Recomputes `flowNodes` when `doc` or `ui` changed. */
 function derive(
@@ -517,6 +562,18 @@ function restore(s: EditorState, doc: GraphDocument): Partial<EditorState> {
   return { ...derive(s, doc, ui), editing, expandedNodeIds }
 }
 
+/** The document with a fragment pasted `times` offsets away, the pasted nodes selected. */
+function pasted(s: EditorState, fragment: Fragment, times: number): Partial<EditorState> {
+  const d = PASTE_OFFSET * times
+  const result = pasteFragment(s.doc, fragment, { x: d, y: d })
+  const ui = {
+    ...s.ui,
+    selectedNodeIds: new Set(result.nodeIds),
+    selectedEdgeIds: new Set<string>(),
+  }
+  return { ...derive(s, result.doc, ui), editing: null }
+}
+
 /** The state after opening a document (Load, New, autosave recovery): saved, no history. */
 function loaded(s: EditorState, doc: GraphDocument): Partial<EditorState> {
   dragGroup = null
@@ -566,6 +623,7 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
     playing: false,
     unlockedIds: new Set(),
     history: emptyHistory(),
+    clipboard: null,
     undo: () =>
       set((s) => {
         // Not while playing, nor in the middle of a drag (React Flow would keep moving the nodes).
@@ -815,6 +873,55 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       // A copy is never the open document, so there are unsaved changes until the next Save.
       set((s) => ({ ...loaded(s, doc), savedDoc: { ...doc } })),
     newDocument: () => get().loadDocument(createEmptyDocument()),
+    copySelection: () => {
+      const s = get()
+      if (dragGroup !== null) return null // positions are mid-move
+      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds)
+      if (!fragment) return null
+      const text = fragmentText(fragment)
+      set({ clipboard: { text, pastes: 0 } })
+      return text
+    },
+    cutSelection: () => {
+      // Not while playing or mid-drag (the dragged nodes would vanish under the pointer).
+      if (get().playing || dragGroup !== null) return null
+      const text = get().copySelection()
+      if (text === null) return null
+      set((s) => {
+        // Like the Delete key: selected edges go too.
+        const doc = deleteNodes(deleteEdges(s.doc, s.ui.selectedEdgeIds), s.ui.selectedNodeIds)
+        const ui = {
+          ...s.ui,
+          selectedNodeIds: new Set<string>(),
+          selectedEdgeIds: new Set<string>(),
+        }
+        return { ...derive(s, doc, ui), ...pruneExpanded(s.expandedNodeIds, s.doc, doc) }
+      })
+      return text
+    },
+    paste: (text) => {
+      const s = get()
+      if (s.playing || dragGroup !== null) return { kind: 'nothing' }
+      const source = text || s.clipboard?.text
+      if (!source) return { kind: 'nothing' }
+      const parsed = parseFragment(source)
+      if (parsed.kind === 'not-fragment') return { kind: 'nothing' }
+      if (parsed.kind === 'invalid') return parsed
+      if (parsed.fragment.nodes.length === 0) return { kind: 'nothing' }
+      const pastes = s.clipboard?.text === source ? s.clipboard.pastes + 1 : 1
+      set((s) => ({ ...pasted(s, parsed.fragment, pastes), clipboard: { text: source, pastes } }))
+      return { kind: 'pasted', nodeIds: [...get().ui.selectedNodeIds] }
+    },
+    duplicateSelection: () => {
+      const s = get()
+      if (s.playing || dragGroup !== null) return
+      const fragment = copyFragment(s.doc, s.ui.selectedNodeIds)
+      if (fragment) set((s) => pasted(s, fragment, 1))
+    },
+    selectAll: () => {
+      // Mid-drag, a new selection would end the drag's undo step halfway through.
+      if (dragGroup === null) get().selectNodes(get().doc.nodes.map((n) => n.id))
+    },
     hasUnsavedChanges: () => get().doc !== get().savedDoc,
     markSaved: (viewport) => {
       const doc = withModified(setViewport(get().doc, viewport))
