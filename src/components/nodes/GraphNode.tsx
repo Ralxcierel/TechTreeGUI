@@ -46,6 +46,7 @@ const SIDE_POSITION: Record<string, Position> = {
 export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
   const setNodeField = useEditorStore((s) => s.setNodeField)
+  const endUndoGroup = useEditorStore((s) => s.endUndoGroup)
   const removeNodeField = useEditorStore((s) => s.removeNodeField)
   const expanded = useEditorStore((s) => s.expandedNodeIds.has(id))
   const toggleExpanded = useEditorStore((s) => s.toggleExpanded)
@@ -154,7 +155,12 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
         )}
         {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
-          const commit = (value: string) => setNodeField(id, line.key, value)
+          // An edit on the card is one undo step of its own. (Enter removes the focused box, and
+          // some browsers send no focusout for that, so the step is ended here.)
+          const commit = (value: string) => {
+            setNodeField(id, line.key, value)
+            endUndoGroup()
+          }
           if (line.title) {
             return line.editable && !readOnly ? (
               <EditableText

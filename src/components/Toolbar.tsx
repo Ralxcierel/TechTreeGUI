@@ -5,6 +5,7 @@ import { paneCenter } from '../editor/flowAdapter'
 import { downloadText, fileNameFor } from '../io/fileIO'
 import { parseDocument, serialize } from '../model'
 import { AutoLayoutButton } from './AutoLayoutButton'
+import { HistoryButtons } from './HistoryButtons'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
 import { PlayBar } from './PlayBar'
 
@@ -96,6 +97,7 @@ export function Toolbar() {
       <div className="toolbar">
         <span className="toolbar__title">Node Sandbox</span>
         <button onClick={handleNew}>New</button>
+        <HistoryButtons />
         {/* The document is read-only in play mode. */}
         <button onClick={handleAdd} disabled={playing}>
           Add node

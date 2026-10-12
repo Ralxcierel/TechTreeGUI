@@ -73,6 +73,7 @@ import {
   type UiState,
 } from './flowAdapter'
 import { autoLayout } from './autoLayout'
+import { emptyHistory, endGroup, record, redo, undo, type History } from './history'
 import { dropInTier, hasTierBands, positionInTier } from './lanes'
 
 /** A type opened in the inspector from the Library (instead of the canvas selection). */
@@ -103,6 +104,24 @@ interface EditorState {
   playing: boolean
   /** Nodes the player has unlocked (editor-only, never saved; cleared when play mode ends). */
   unlockedIds: ReadonlySet<string>
+  /** Undo/redo stacks of document snapshots (P5-0); cleared on New and Load. */
+  history: History
+  /** Undoes the newest step (not in play mode). */
+  undo: () => void
+  /** Redoes the most recently undone step (not in play mode). */
+  redo: () => void
+  /** A drag (of nodes, or of the selection box) starts: its moves become one undo step. */
+  startDrag: () => void
+  /**
+   * Ends a drag's undo step if it is still open. Drags end in `dropNodes`; this is the backstop for
+   * a drag React Flow abandons without calling its stop callback.
+   */
+  endDrag: () => void
+  /**
+   * Ends the newest undo step's group, so the next change starts a new step: called when an
+   * editor box is left or a choice is picked (D2), and when the selection changes.
+   */
+  endUndoGroup: () => void
   /** Turns play mode on or off; either way the unlocked set starts empty. */
   setPlaying: (playing: boolean) => void
   /** In play mode: unlocks an available node, or re-locks an unlocked one and what depends on it. */
@@ -415,7 +434,99 @@ function openType(s: EditorState, editing: Editing | null): Partial<EditorState>
 
 const initialDoc = createEmptyDocument()
 
-export const useEditorStore = create<EditorState>()((set, get) => {
+/**
+ * The undo group of the change being made (D2 of Phase 5), set by `inGroup` while an action runs:
+ * consecutive changes with the same group become one undo step. Null: a step of its own.
+ */
+let changeGroup: string | null = null
+/** The group of the drag in progress, or null when nothing is being dragged. */
+let dragGroup: string | null = null
+let drags = 0
+/** The group of the removals being made right now (see `removalGroup`). */
+let removal: string | null = null
+let removals = 0
+
+/**
+ * One group for every removal made in the same moment: React Flow's Delete key removes a node's
+ * edges and the node in two separate calls, which must undo together.
+ */
+function removalGroup(): string {
+  if (removal === null) {
+    removal = `remove:${++removals}`
+    queueMicrotask(() => {
+      removal = null
+    })
+  }
+  return removal
+}
+
+/**
+ * The undo group for a batch of React Flow changes: a removal, the drag in progress, or moves of
+ * the same nodes outside a drag (arrow-key nudges: holding a key is one step).
+ */
+function changesGroup(changes: readonly (NodeChange | EdgeChange)[]): string | null {
+  if (changes.some((c) => c.type === 'remove')) return removalGroup()
+  if (dragGroup !== null) return dragGroup
+  const moved = changes.flatMap((c) => (c.type === 'position' ? [c.id] : []))
+  return moved.length > 0 ? `move:${moved.sort().join(',')}` : null
+}
+
+const changesSelection = (changes: readonly (NodeChange | EdgeChange)[]) =>
+  changes.some((c) => c.type === 'select')
+
+function inGroup<T>(group: string | null, run: () => T): T {
+  const outer = changeGroup
+  changeGroup = group
+  try {
+    return run()
+  } finally {
+    changeGroup = outer
+  }
+}
+
+/** Which keys a patch changes (for undo groups), e.g. "name" or "style.fill". */
+function patchKeys(patch: object): string {
+  return Object.entries(patch)
+    .map(([k, v]) =>
+      k === 'style' && v && typeof v === 'object' ? `style.${Object.keys(v).sort().join('.')}` : k,
+    )
+    .sort()
+    .join(',')
+}
+
+/**
+ * Shows a document from the history (undo/redo): keeps the selection and open sections of nodes
+ * that still exist, and closes a type editor whose type is gone.
+ */
+function restore(s: EditorState, doc: GraphDocument): Partial<EditorState> {
+  const nodeIds = new Set(doc.nodes.map((n) => n.id))
+  const edgeIds = new Set(doc.edges.map((e) => e.id))
+  const keep = (ids: ReadonlySet<string>, known: ReadonlySet<string>) =>
+    [...ids].every((id) => known.has(id)) ? ids : new Set([...ids].filter((id) => known.has(id)))
+  const selectedNodeIds = keep(s.ui.selectedNodeIds, nodeIds)
+  const selectedEdgeIds = keep(s.ui.selectedEdgeIds, edgeIds)
+  const ui =
+    selectedNodeIds === s.ui.selectedNodeIds && selectedEdgeIds === s.ui.selectedEdgeIds
+      ? s.ui
+      : { ...s.ui, selectedNodeIds, selectedEdgeIds }
+  const types = s.editing?.kind === 'nodeType' ? doc.nodeTypes : doc.edgeTypes
+  const editing = s.editing && types.some((t) => t.id === s.editing!.id) ? s.editing : null
+  const expandedNodeIds = keep(s.expandedNodeIds, nodeIds)
+  return { ...derive(s, doc, ui), editing, expandedNodeIds }
+}
+
+export const useEditorStore = create<EditorState>()((rawSet, get) => {
+  /**
+   * Every action changes the store through this `set`. When an update changes the document and
+   * doesn't manage the history itself (undo, redo, load and save do), the document before it is
+   * recorded as an undo step, joining the newest step if it has the same group (D1, D2).
+   */
+  const set = (partial: Partial<EditorState> | ((s: EditorState) => Partial<EditorState>)): void =>
+    rawSet((s) => {
+      const update = typeof partial === 'function' ? partial(s) : partial
+      if (update.doc === undefined || update.doc === s.doc || 'history' in update) return update
+      return { ...update, history: record(s.history, s.doc, changeGroup) }
+    })
   /** Applies a model result that may be refused; returns the reason, or null when it worked. */
   const apply = (result: TypeOpResult): string | null => {
     if (!result.ok) return result.error
@@ -433,6 +544,26 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     editing: null,
     playing: false,
     unlockedIds: new Set(),
+    history: emptyHistory(),
+    undo: () =>
+      set((s) => {
+        // Not while playing, nor in the middle of a drag (React Flow would keep moving the nodes).
+        const step = s.playing || dragGroup !== null ? null : undo(s.history, s.doc)
+        return step ? { ...restore(s, step.doc), history: step.history } : s
+      }),
+    redo: () =>
+      set((s) => {
+        const step = s.playing || dragGroup !== null ? null : redo(s.history, s.doc)
+        return step ? { ...restore(s, step.doc), history: step.history } : s
+      }),
+    startDrag: () => {
+      dragGroup = `drag:${++drags}`
+    },
+    endDrag: () => {
+      dragGroup = null
+    },
+    endUndoGroup: () =>
+      set((s) => (s.history.group === null ? s : { history: endGroup(s.history) })),
     setPlaying: (playing) => set({ playing, unlockedIds: new Set() }),
     togglePlayUnlock: (nodeId) =>
       set((s) =>
@@ -441,20 +572,30 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           : s,
       ),
     addNode: (typeId, position) => set((s) => derive(s, addNode(s.doc, typeId, position), s.ui)),
-    onNodesChange: (changes) =>
-      set((s) => {
-        const next = reduceNodeChanges(s.doc, s.ui, playSafe(s.playing, changes))
-        return {
-          ...derive(s, next.doc, next.ui),
-          ...closeEditingOnSelect(s.editing, next.ui),
-          ...pruneExpanded(s.expandedNodeIds, s.doc, next.doc),
-        }
-      }),
-    onEdgesChange: (changes) =>
-      set((s) => {
-        const next = reduceEdgeChanges(s.doc, s.ui, playSafe(s.playing, changes))
-        return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
-      }),
+    onNodesChange: (changes) => {
+      // While dragging, every move joins the drag's one undo step; removals made together are one
+      // step too.
+      inGroup(changesGroup(changes), () =>
+        set((s) => {
+          const next = reduceNodeChanges(s.doc, s.ui, playSafe(s.playing, changes))
+          return {
+            ...derive(s, next.doc, next.ui),
+            ...closeEditingOnSelect(s.editing, next.ui),
+            ...pruneExpanded(s.expandedNodeIds, s.doc, next.doc),
+          }
+        }),
+      )
+      if (changesSelection(changes)) get().endUndoGroup()
+    },
+    onEdgesChange: (changes) => {
+      inGroup(changesGroup(changes), () =>
+        set((s) => {
+          const next = reduceEdgeChanges(s.doc, s.ui, playSafe(s.playing, changes))
+          return { ...derive(s, next.doc, next.ui), ...closeEditingOnSelect(s.editing, next.ui) }
+        }),
+      )
+      if (changesSelection(changes)) get().endUndoGroup()
+    },
     isValidConnection: (connection) => {
       const typeId = activeEdgeTypeId(get())
       const { doc } = get()
@@ -478,7 +619,9 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       return id
     },
     updateEdgeType: (typeId, patch) =>
-      set((s) => derive(s, updateEdgeType(s.doc, typeId, patch), s.ui)),
+      inGroup(`edgeType:${typeId}:${patchKeys(patch)}`, () =>
+        set((s) => derive(s, updateEdgeType(s.doc, typeId, patch), s.ui)),
+      ),
     deleteEdgeType: (typeId) => {
       const result = deleteEdgeType(get().doc, typeId)
       if (!result.ok) return result.error
@@ -497,7 +640,8 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           selectedNodeIds: new Set(nodeIds.filter((id) => known.has(id))),
           selectedEdgeIds: new Set<string>(),
         }
-        return { ...derive(s, s.doc, ui), editing: null }
+        // A new selection also ends the newest undo step's group (D2).
+        return { ...derive(s, s.doc, ui), editing: null, history: endGroup(s.history) }
       }),
     toggleExpanded: (nodeId) =>
       set((s) => {
@@ -516,7 +660,9 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       return id
     },
     updateNodeType: (typeId, patch) =>
-      set((s) => derive(s, updateNodeType(s.doc, typeId, patch), s.ui)),
+      inGroup(`nodeType:${typeId}:${patchKeys(patch)}`, () =>
+        set((s) => derive(s, updateNodeType(s.doc, typeId, patch), s.ui)),
+      ),
     deleteNodeType: (typeId) => {
       const result = deleteNodeType(get().doc, typeId)
       if (!result.ok) return result.error
@@ -532,8 +678,14 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       set((s) => derive(s, doc, s.ui))
       return key
     },
-    updateField: (typeId, key, patch) => apply(updateField(get().doc, typeId, key, patch)),
-    setFieldDefault: (typeId, key, value) => apply(setFieldDefault(get().doc, typeId, key, value)),
+    updateField: (typeId, key, patch) =>
+      inGroup(`field:${typeId}:${key}:${patchKeys(patch)}`, () =>
+        apply(updateField(get().doc, typeId, key, patch)),
+      ),
+    setFieldDefault: (typeId, key, value) =>
+      inGroup(`default:${typeId}:${key}`, () =>
+        apply(setFieldDefault(get().doc, typeId, key, value)),
+      ),
     renameFieldKey: (typeId, oldKey, newKey) =>
       apply(renameFieldKey(get().doc, typeId, oldKey, newKey)),
     removeField: (typeId, key) => set((s) => derive(s, removeField(s.doc, typeId, key), s.ui)),
@@ -544,7 +696,9 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       return id
     },
     updateHandle: (typeId, handleId, patch) =>
-      apply(updateHandle(get().doc, typeId, handleId, patch)),
+      inGroup(`handle:${typeId}:${handleId}:${patchKeys(patch)}`, () =>
+        apply(updateHandle(get().doc, typeId, handleId, patch)),
+      ),
     renameHandleId: (typeId, oldId, newId) =>
       apply(renameHandleId(get().doc, typeId, oldId, newId)),
     removeHandle: (typeId, handleId) => apply(removeHandle(get().doc, typeId, handleId)),
@@ -557,11 +711,18 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           : addStarterEdgeType(get().doc, starterId),
       ),
     setNodeField: (nodeId, key, value) =>
-      set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
+      inGroup(`value:${nodeId}:${key}`, () =>
+        set((s) => derive(s, updateNodeData(s.doc, nodeId, key, value), s.ui)),
+      ),
     removeNodeField: (nodeId, key) =>
-      set((s) => derive(s, removeNodeData(s.doc, nodeId, key), s.ui)),
+      // Same group as setting the value: emptying a box while typing stays in one step.
+      inGroup(`value:${nodeId}:${key}`, () =>
+        set((s) => derive(s, removeNodeData(s.doc, nodeId, key), s.ui)),
+      ),
     setNodeStyleOverride: (nodeId, key, value) =>
-      set((s) => derive(s, setStyleOverride(s.doc, nodeId, key, value), s.ui)),
+      inGroup(`override:${nodeId}:${key}`, () =>
+        set((s) => derive(s, setStyleOverride(s.doc, nodeId, key, value), s.ui)),
+      ),
     setEdgeType: (edgeId, typeId) => {
       const result = setEdgeType(get().doc, edgeId, typeId)
       if (!result.ok) return result.error
@@ -570,13 +731,15 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     },
     setLayoutDirection: (direction) =>
       set((s) => derive(s, setLayoutDirection(s.doc, direction), s.ui)),
-    setLayoutSpacing: (spacing) => set((s) => derive(s, setLayoutSpacing(s.doc, spacing), s.ui)),
+    setLayoutSpacing: (spacing) =>
+      inGroup('spacing', () => set((s) => derive(s, setLayoutSpacing(s.doc, spacing), s.ui))),
     addTier: (name) => {
       const { doc, id } = addTier(get().doc, name)
       set((s) => derive(s, doc, s.ui))
       return id
     },
-    renameTier: (tierId, name) => set((s) => derive(s, renameTier(s.doc, tierId, name), s.ui)),
+    renameTier: (tierId, name) =>
+      inGroup(`tier:${tierId}`, () => set((s) => derive(s, renameTier(s.doc, tierId, name), s.ui))),
     moveTier: (tierId, by) => set((s) => derive(s, moveTier(s.doc, tierId, by), s.ui)),
     removeTier: (tierId) => set((s) => derive(s, removeTier(s.doc, tierId), s.ui)),
     setNodeTier: (nodeId, tierId) =>
@@ -595,23 +758,27 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         return derive(s, doc, s.ui)
       }),
     dropNodes: (nodeIds) =>
-      set((s) => {
-        // No lanes or rings (no tiers): dropping changes nothing.
-        if (s.playing || !hasTierBands(s.doc.layout)) return s
-        const tree = treeNodeIds(s.doc)
-        const moves = new Map<string, Position>()
-        let doc = s.doc
-        for (const id of nodeIds) {
-          const node = doc.nodes.find((n) => n.id === id)
-          // Only tree nodes snap and change tier (developer's choice for P4-4).
-          if (!node || !tree.has(id)) continue
-          const drop = dropInTier(doc.layout, node.position, nodeSize(doc, s.ui, node))
-          if (!drop) continue
-          doc = setNodeTier(doc, id, drop.tierId)
-          if (drop.position !== node.position) moves.set(id, drop.position)
-        }
-        if (moves.size > 0) doc = moveNodes(doc, moves)
-        return derive(s, doc, s.ui)
+      // The snap joins the drag's undo step; the drag ends here.
+      inGroup(dragGroup, () => {
+        dragGroup = null
+        set((s) => {
+          // No lanes or rings (no tiers): dropping changes nothing.
+          if (s.playing || !hasTierBands(s.doc.layout)) return s
+          const tree = treeNodeIds(s.doc)
+          const moves = new Map<string, Position>()
+          let doc = s.doc
+          for (const id of nodeIds) {
+            const node = doc.nodes.find((n) => n.id === id)
+            // Only tree nodes snap and change tier (developer's choice for P4-4).
+            if (!node || !tree.has(id)) continue
+            const drop = dropInTier(doc.layout, node.position, nodeSize(doc, s.ui, node))
+            if (!drop) continue
+            doc = setNodeTier(doc, id, drop.tierId)
+            if (drop.position !== node.position) moves.set(id, drop.position)
+          }
+          if (moves.size > 0) doc = moveNodes(doc, moves)
+          return derive(s, doc, s.ui)
+        })
       }),
     autoLayout: () => {
       const s = get()
@@ -620,9 +787,11 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       if (moves.size > 0) set((s) => derive(s, moveNodes(s.doc, moves), s.ui))
       return [...moves.keys()]
     },
-    setDocumentName: (name) => set((s) => derive(s, renameDocument(s.doc, name), s.ui)),
+    setDocumentName: (name) =>
+      inGroup('name', () => set((s) => derive(s, renameDocument(s.doc, name), s.ui))),
     loadDocument: (doc) =>
       set((s) => {
+        dragGroup = null
         const ui = uiForLoadedDocument(doc, s.doc, s.ui)
         return {
           doc,
@@ -635,13 +804,15 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           editing: null,
           playing: false,
           unlockedIds: new Set(),
+          history: emptyHistory(), // no undo across New or Load (D12)
         }
       }),
     newDocument: () => get().loadDocument(createEmptyDocument()),
     hasUnsavedChanges: () => get().doc !== get().savedDoc,
     markSaved: (viewport) => {
       const doc = withModified(setViewport(get().doc, viewport))
-      set((s) => ({ ...derive(s, doc, s.ui), savedDoc: doc }))
+      // Not an undo step (the viewport and time stamp only); a group being typed ends here.
+      set((s) => ({ ...derive(s, doc, s.ui), savedDoc: doc, history: endGroup(s.history) }))
       return doc
     },
   }

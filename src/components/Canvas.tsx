@@ -34,6 +34,7 @@ export function Canvas() {
   const playing = useEditorStore((s) => s.playing)
   const togglePlayUnlock = useEditorStore((s) => s.togglePlayUnlock)
   const dropNodes = useEditorStore((s) => s.dropNodes)
+  const startDrag = useEditorStore((s) => s.startDrag)
   // Read once: the canvas starts at the document's saved viewport; later loads set it explicitly.
   // The live viewport is copied back into the document only on Save (see Toolbar).
   const [initialViewport] = useState(() => useEditorStore.getState().doc.view.viewport)
@@ -91,6 +92,8 @@ export function Canvas() {
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodesChange={onNodesChange}
+        // A drag is one undo step. React Flow calls these for drags of the selection box too.
+        onNodeDragStart={startDrag}
         // Dropped nodes snap into the tier lane or ring under them (D9, D12); `nodes` are all the
         // dragged ones.
         onNodeDragStop={(_, _node, nodes) => dropNodes(nodes.map((n) => n.id))}

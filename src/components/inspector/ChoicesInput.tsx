@@ -20,8 +20,8 @@ export function ChoicesInput({ id, options, defaultValue, onCommit }: ChoicesInp
   const [draft, setDraft] = useState(saved)
   const [error, setError] = useState<string | null>(null)
   const errorId = useId()
-  // When the saved choices change elsewhere, show them (and drop an error about the old ones).
-  // Nothing can change them while this box has focus yet; undo (Phase 5) will need a look here.
+  // When the saved choices change elsewhere (e.g. undo), show them (and drop an error about the
+  // old ones).
   const [shown, setShown] = useState(saved)
   if (shown !== saved) {
     setShown(saved)
