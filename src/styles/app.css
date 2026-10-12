@@ -1042,3 +1042,55 @@ body,
   border-radius: 4px;
   white-space: nowrap;
 }
+
+/* Radial mode: the tiers as rings around the flow origin (TierRings). */
+.tier-rings {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tier-rings__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tier-rings__band {
+  fill: none;
+}
+
+.tier-rings__band--even {
+  stroke: rgb(56 189 248 / 0.05);
+}
+
+.tier-rings__band--odd {
+  stroke: rgb(148 163 184 / 0.07);
+}
+
+.tier-rings__boundary {
+  fill: none;
+  stroke: rgb(148 163 184 / 0.35);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+
+/* At the top (outer edge) of its band, centred above the origin. */
+.tier-rings__name {
+  position: absolute;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--panel);
+  border-radius: 4px;
+  white-space: nowrap;
+}

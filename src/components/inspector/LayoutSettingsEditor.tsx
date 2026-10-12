@@ -1,6 +1,6 @@
 // The document's layout settings (schema v4, decision D5 of Phase 4): which way the tree grows and
-// how far apart its layers are. Changing them redraws nothing yet and never moves nodes; lanes and
-// auto-layout use them later.
+// how far apart its layers are. Changing them redraws the tier lanes or rings but never moves
+// nodes; run Auto-layout to rearrange.
 import { useId, useState } from 'react'
 import { useEditorStore } from '../../editor/store'
 import { LAYOUT_DIRECTIONS, type LayoutDirection } from '../../model'

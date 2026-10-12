@@ -78,7 +78,7 @@ describe('AutoLayoutButton', () => {
     )
   })
 
-  it('is disabled, saying why, without tree nodes, in radial mode and in play mode', () => {
+  it('is disabled, saying why, without tree nodes and in play mode (not in radial)', () => {
     render(<AutoLayoutButton />)
     expect(button().matches(':disabled')).toBe(true)
     expect(button().title).toMatch(/No tree nodes/)
@@ -88,12 +88,8 @@ describe('AutoLayoutButton', () => {
     expect(button().matches(':disabled')).toBe(false)
     expect(button().title).toBe('')
     act(() => s().setLayoutDirection('radial'))
-    expect(button().matches(':disabled')).toBe(true)
-    expect(button().title).toMatch(/Radial/)
-    act(() => {
-      s().setLayoutDirection('down')
-      s().setPlaying(true)
-    })
+    expect(button().matches(':disabled')).toBe(false)
+    act(() => s().setPlaying(true))
     expect(button().matches(':disabled')).toBe(true)
     expect(button().title).toMatch(/play mode/)
   })

@@ -5,6 +5,7 @@ import {
   connect,
   createEmptyDocument,
   setLayoutDirection,
+  setLayoutSpacing,
   setNodeTier,
   type GraphDocument,
   type LayoutDirection,
@@ -12,6 +13,8 @@ import {
 } from '../model'
 import { autoLayout, BLOCK_GAP, LAYER_GAP, spreadInOrder } from './autoLayout'
 import type { Size } from './flowAdapter'
+import { rings } from './lanes'
+import { CENTRE_RING_SHARE } from './radialLayout'
 
 const W = 200
 const H = 60
@@ -25,6 +28,7 @@ interface Spec {
   tierOf?: Record<string, string>
   notes?: string[]
   direction?: LayoutDirection
+  spacing?: number
 }
 
 function build(spec: Spec): GraphDocument {
@@ -44,6 +48,7 @@ function build(spec: Spec): GraphDocument {
     if (!r.ok) throw new Error(r.error)
     doc = r.doc
   }
+  if (spec.spacing !== undefined) doc = setLayoutSpacing(doc, spec.spacing)
   return setLayoutDirection(doc, spec.direction ?? 'down')
 }
 
@@ -219,9 +224,9 @@ describe('autoLayout: which nodes, cycles and separate trees', () => {
     expect(centreY(m, 'lone')).toBe(125)
   })
 
-  it('returns nothing in radial mode or without a tree', () => {
-    expect(layOut({ nodes: ['a', 'b'], links: [['a', 'b']], direction: 'radial' }).size).toBe(0)
+  it('returns nothing without a tree', () => {
     expect(layOut({ nodes: ['a', 'b'] }).size).toBe(0)
+    expect(layOut({ nodes: ['a', 'b'], direction: 'radial' }).size).toBe(0)
   })
 
   it('lays out a cycle as a chain, ignoring the edge that closes the loop', () => {
@@ -313,5 +318,170 @@ describe('spreadInOrder', () => {
 
   it('handles an empty layer', () => {
     expect(spreadInOrder([], [])).toEqual([])
+  })
+})
+
+describe('autoLayout: radial (D12)', () => {
+  const radial = (spec: Omit<Spec, 'direction'>, sizes?: Record<string, Size>) =>
+    layOut({ ...spec, direction: 'radial' }, sizes)
+  /** A node's centre: distance from the origin, and angle in degrees clockwise from 12 o'clock. */
+  const polar = (m: Map<string, Position>, id: string) => {
+    const x = centreX(m, id)
+    const y = centreY(m, id)
+    const deg = (Math.atan2(x, -y) * 180) / Math.PI
+    return { r: Math.hypot(x, y), deg: (deg + 360) % 360 }
+  }
+
+  it('puts a single root in the centre and rank k on the ring of radius k × spacing', () => {
+    const m = radial({
+      nodes: ['a', 'b', 'c'],
+      links: [
+        ['a', 'b'],
+        ['b', 'c'],
+      ],
+    })
+    expect(at(m, 'a')).toEqual({ x: -100, y: -30 })
+    expect(polar(m, 'b').r).toBeCloseTo(250, 0)
+    expect(polar(m, 'c').r).toBeCloseTo(500, 0)
+    // b and c share one slice (the whole circle), so they sit at the same angle.
+    expect(polar(m, 'c').deg).toBeCloseTo(polar(m, 'b').deg, 0)
+  })
+
+  it("gives each branch a slice sized by its leaves, clockwise from 12 o'clock", () => {
+    // r → c1 → (g1, g2) and r → c2: 3 leaves, so c1 gets 240°, c2 120°.
+    const m = radial({
+      nodes: ['r', 'c1', 'c2', 'g1', 'g2'],
+      links: [
+        ['r', 'c1'],
+        ['r', 'c2'],
+        ['c1', 'g1'],
+        ['c1', 'g2'],
+      ],
+    })
+    expect(polar(m, 'c1').deg).toBeCloseTo(120, 0)
+    expect(polar(m, 'c2').deg).toBeCloseTo(300, 0)
+    expect(polar(m, 'g1').deg).toBeCloseTo(60, 0)
+    expect(polar(m, 'g2').deg).toBeCloseTo(180, 0)
+  })
+
+  it('follows only the primary (first, inner) prerequisite', () => {
+    // d needs b (first edge) and c: it sits in b's slice, not between them.
+    const m = radial({
+      nodes: ['a', 'b', 'c', 'd'],
+      links: [
+        ['a', 'b'],
+        ['a', 'c'],
+        ['b', 'd'],
+        ['c', 'd'],
+      ],
+    })
+    expect(polar(m, 'd').deg).toBeCloseTo(polar(m, 'b').deg, 0)
+    expect(polar(m, 'd').r).toBeCloseTo(500, 0)
+  })
+
+  it('spreads several roots on a small centre ring, just far enough apart', () => {
+    const m = radial({
+      nodes: ['a', 'b', 'x', 'y'],
+      links: [
+        ['a', 'x'],
+        ['b', 'y'],
+      ],
+      spacing: 400,
+    })
+    // Two roots opposite each other (90° and 270°): 200-wide cards LAYER_GAP apart.
+    const r = (W + LAYER_GAP) / 2
+    expect(at(m, 'a')).toEqual({ x: r - W / 2, y: -H / 2 })
+    expect(at(m, 'b')).toEqual({ x: -r - W / 2, y: -H / 2 })
+  })
+
+  it('sizes the centre ring for the tightest pair of neighbours', () => {
+    // Roots with 1, 1 and 4 leaves: slices of 60°, 60° and 240°, so a and b are only 60° apart.
+    const m = radial({
+      nodes: ['a', 'b', 'c', 'x', 'y', 'p', 'q', 'r', 's'],
+      links: [
+        ['a', 'x'],
+        ['b', 'y'],
+        ['c', 'p'],
+        ['c', 'q'],
+        ['c', 'r'],
+        ['c', 's'],
+      ],
+      spacing: 600,
+    })
+    expect([polar(m, 'a').deg, polar(m, 'b').deg, polar(m, 'c').deg].map(Math.round)).toEqual([
+      30, 90, 240,
+    ])
+    // Chord between a and b = 2 r sin(30°) = r, which must be W + LAYER_GAP.
+    for (const id of ['a', 'b', 'c']) {
+      expect(Math.abs(polar(m, id).r - (W + LAYER_GAP))).toBeLessThan(1)
+    }
+  })
+
+  it('keeps the centre ring inside the centre disc, even if its cards then overlap', () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `r${i}`)
+    const m = radial({ nodes: [...ids, 'z'], links: ids.map((id): [string, string] => [id, 'z']) })
+    // (Within a pixel: positions are rounded.)
+    for (const id of ids) expect(Math.abs(polar(m, id).r - CENTRE_RING_SHARE * 250)).toBeLessThan(1)
+  })
+
+  it('places tiered nodes in the middle of their ring', () => {
+    const m = radial({
+      nodes: ['a', 'b', 'c'],
+      links: [
+        ['a', 'b'],
+        ['b', 'c'],
+      ],
+      tiers: ['Ancient', 'Classical', 'Medieval'],
+      tierOf: { b: 'medieval' },
+    })
+    const ring = rings({
+      direction: 'radial',
+      spacing: 250,
+      tiers: [
+        { id: 'ancient', name: '' },
+        { id: 'classical', name: '' },
+        { id: 'medieval', name: '' },
+      ],
+    })[2]!
+    expect(polar(m, 'b').r).toBeCloseTo((ring.inner + ring.outer) / 2, 0)
+    expect(polar(m, 'c').r).toBeCloseTo(750, 0) // past the last tier: the next ring out
+  })
+
+  it('starts a separate branch for a node without an inner prerequisite', () => {
+    // b is chained to a inside the same tier: both start their own branch on ring 1.
+    const m = radial({
+      nodes: ['a', 'b'],
+      links: [['a', 'b']],
+      tiers: ['Ancient', 'Classical'],
+      tierOf: { a: 'classical', b: 'classical' },
+    })
+    expect(polar(m, 'a')).toMatchObject({ deg: expect.closeTo(90, 0) })
+    expect(polar(m, 'b')).toMatchObject({ deg: expect.closeTo(270, 0) })
+    expect(polar(m, 'a').r).toBeCloseTo(250, 0)
+  })
+
+  it('lays out a cycle, moves only tree nodes, and gives whole numbers', () => {
+    const m = radial({
+      nodes: ['a', 'b', 'c'],
+      links: [
+        ['a', 'b'],
+        ['b', 'c'],
+        ['c', 'a'],
+      ],
+      notes: ['n'],
+    })
+    expect([...m.keys()]).toEqual(['a', 'b', 'c'])
+    for (const p of m.values()) {
+      expect(Number.isInteger(p.x) && Number.isInteger(p.y)).toBe(true)
+      expect(Object.is(p.x, -0) || Object.is(p.y, -0)).toBe(false)
+    }
+    expect([polar(m, 'b').r, polar(m, 'c').r].map(Math.round)).toEqual([250, 500])
+  })
+
+  it('never gives -0', () => {
+    // A tiny root at the centre: its x and y before rounding are -0.3, which round to -0.
+    const tiny = { width: 0.6, height: 0.6 }
+    const m = radial({ nodes: ['a', 'b'], links: [['a', 'b']] }, { a: tiny })
+    expect(Object.is(at(m, 'a').x, 0) && Object.is(at(m, 'a').y, 0)).toBe(true)
   })
 })

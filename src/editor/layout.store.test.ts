@@ -113,16 +113,11 @@ describe('tier lanes (D9)', () => {
     expect(node(note)).toMatchObject({ tierId: null, position: { x: 10, y: 230 } })
   })
 
-  it('does nothing without tiers, in radial mode or in play mode', () => {
+  it('does nothing without tiers or in play mode', () => {
     const { a } = setUp()
     move(a, 230)
-    s().setLayoutDirection('radial')
-    let doc = s().doc
-    s().dropNodes([a])
-    expect(s().doc).toBe(doc)
-    s().setLayoutDirection('down')
     s().setPlaying(true)
-    doc = s().doc
+    let doc = s().doc
     s().dropNodes([a])
     expect(s().doc).toBe(doc)
     s().setPlaying(false)
@@ -131,6 +126,26 @@ describe('tier lanes (D9)', () => {
     doc = s().doc
     s().dropNodes([a])
     expect(s().doc).toBe(doc)
+  })
+
+  it('snaps a dropped tree node onto the ring under its centre in radial mode', () => {
+    const { a } = setUp()
+    s().setLayoutDirection('radial')
+    move(a, 230) // a 220 × 40 card: centre (120, 250), 277 from the origin, in ring 1
+    s().dropNodes([a])
+    const { tierId, position } = node(a)
+    expect(tierId).toBe('classical')
+    const [cx, cy] = [position.x + 110, position.y + 20]
+    expect(Math.hypot(cx, cy)).toBeCloseTo(200, 0)
+    expect(Math.atan2(cy, cx)).toBeCloseTo(Math.atan2(250, 120), 2)
+  })
+
+  it('moves a node onto the ring of the tier picked in the inspector in radial mode', () => {
+    const { a } = setUp()
+    s().setLayoutDirection('radial')
+    s().onNodesChange([{ type: 'position', id: a, position: { x: -110, y: 480 } }])
+    s().setNodeTier(a, 'classical')
+    expect(node(a)).toMatchObject({ tierId: 'classical', position: { x: -110, y: 180 } })
   })
 
   it('moves a node into the lane of the tier picked in the inspector; "no tier" leaves it', () => {

@@ -13,6 +13,7 @@ import { resolveNodeStyle } from '../model'
 import { GraphEdge } from './edges/GraphEdge'
 import { GraphNode } from './nodes/GraphNode'
 import { TierLanes } from './TierLanes'
+import { TierRings } from './TierRings'
 
 // Defined outside the component so React Flow sees the same object on every render.
 const nodeTypes = { graph: GraphNode }
@@ -90,7 +91,8 @@ export function Canvas() {
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodesChange={onNodesChange}
-        // Dropped nodes snap into the tier lane under them (D9); `nodes` are all the dragged ones.
+        // Dropped nodes snap into the tier lane or ring under them (D9, D12); `nodes` are all the
+        // dragged ones.
         onNodeDragStop={(_, _node, nodes) => dropNodes(nodes.map((n) => n.id))}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -111,6 +113,7 @@ export function Canvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} />
         <TierLanes />
+        <TierRings />
         {/* No lock button while playing: it writes straight into React Flow's own settings and
             could turn dragging back on. */}
         <Controls showInteractive={!playing} />

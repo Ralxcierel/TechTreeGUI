@@ -73,7 +73,7 @@ import {
   type UiState,
 } from './flowAdapter'
 import { autoLayout } from './autoLayout'
-import { dropInLane, lanes, positionInTier } from './lanes'
+import { dropInTier, hasTierBands, positionInTier } from './lanes'
 
 /** A type opened in the inspector from the Library (instead of the canvas selection). */
 export type Editing = { kind: 'edgeType' | 'nodeType'; id: string }
@@ -179,11 +179,12 @@ interface EditorState {
   moveTier: (tierId: string, by: -1 | 1) => void
   /** Removes a tier; its nodes lose their tier but don't move. */
   removeTier: (tierId: string) => void
-  /** Puts a node in a tier (moving it into the tier's lane), or in none with null (no move). */
+  /** Puts a node in a tier (moving it into the tier's lane or ring), or in none with null (no move). */
   setNodeTier: (nodeId: string, tierId: string | null) => void
   /**
-   * After a drag: each dropped tree node snaps into the lane under its centre and takes that tier,
-   * or loses its tier outside every lane (D9). Nothing happens without lanes or in play mode.
+   * After a drag: each dropped tree node snaps into the lane (or ring, D12) under its centre and
+   * takes that tier, or loses its tier outside them all (D9). Nothing happens without tiers or in
+   * play mode.
    */
   dropNodes: (nodeIds: readonly string[]) => void
   /**
@@ -231,8 +232,8 @@ export function activeNodeTypeId(s: Pick<EditorState, 'doc' | 'activeNodeTypeId'
 }
 
 /**
- * A node's size for lane snapping and auto-layout: as measured on screen, else its type's
- * width × 60.
+ * A node's size for snapping into lanes or rings and for auto-layout: as measured on screen,
+ * else its type's width × 60.
  */
 function nodeSize(doc: GraphDocument, ui: UiState, node: GraphDocument['nodes'][number]): Size {
   const measured = ui.measured.get(node.id)
@@ -320,7 +321,7 @@ export function selectTreeNodeIds(s: Pick<EditorState, 'doc'>): ReadonlySet<stri
 
 /**
  * The moves auto-layout would make (P4-5): the new position of every tree node that isn't there
- * yet. Empty in radial mode, without tree nodes, or when the tree is already laid out.
+ * yet. Empty without tree nodes, or when the tree is already laid out.
  */
 export function autoLayoutMoves(s: Pick<EditorState, 'doc' | 'ui'>): Map<string, Position> {
   const byId = new Map(s.doc.nodes.map((n) => [n.id, n]))
@@ -582,7 +583,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       set((s) => {
         if (s.playing) return s // the document is read-only in play mode
         let doc = setNodeTier(s.doc, nodeId, tierId)
-        // Picking a tier also moves the node into its lane (D9); "no tier" leaves it in place.
+        // Picking a tier also moves the node into its lane or ring (D9, D12); "no tier" leaves it.
         const node = doc.nodes.find((n) => n.id === nodeId)
         const at =
           node && tierId !== null
@@ -595,8 +596,8 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       }),
     dropNodes: (nodeIds) =>
       set((s) => {
-        // No lanes (radial, or no tiers): dropping changes nothing.
-        if (s.playing || lanes(s.doc.layout).length === 0) return s
+        // No lanes or rings (no tiers): dropping changes nothing.
+        if (s.playing || !hasTierBands(s.doc.layout)) return s
         const tree = treeNodeIds(s.doc)
         const moves = new Map<string, Position>()
         let doc = s.doc
@@ -604,7 +605,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           const node = doc.nodes.find((n) => n.id === id)
           // Only tree nodes snap and change tier (developer's choice for P4-4).
           if (!node || !tree.has(id)) continue
-          const drop = dropInLane(doc.layout, node.position, nodeSize(doc, s.ui, node))
+          const drop = dropInTier(doc.layout, node.position, nodeSize(doc, s.ui, node))
           if (!drop) continue
           doc = setNodeTier(doc, id, drop.tierId)
           if (drop.position !== node.position) moves.set(id, drop.position)

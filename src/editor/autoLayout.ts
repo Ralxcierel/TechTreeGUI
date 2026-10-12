@@ -1,7 +1,9 @@
-// Linear auto-layout of the tech tree (P4-5; decisions D1, D10, D11 of Phase 4). Pure: given the
-// document and node sizes it returns new positions; nothing here changes the document.
+// Auto-layout of the tech tree (P4-5 and P4-6; decisions D1, D10, D11, D12 of Phase 4). Pure:
+// given the document and node sizes it returns new positions; nothing here changes the document.
+// Ranks (step 1) are shared; the radial direction then uses `radialLayout` (rings) instead of
+// steps 2 to 4.
 //
-// A hand-written layered ("Sugiyama-style") layout:
+// The linear directions use a hand-written layered ("Sugiyama-style") layout:
 // 1. Ranks: a tiered node's rank is its tier's index; an untiered node's is one more than the
 //    highest rank among its prerequisites (0 for roots). Edges that close a prerequisite loop are
 //    ignored here and in the steps below, so a cycle is laid out as a chain.
@@ -23,6 +25,7 @@ import {
 } from '../model'
 import type { Size } from './flowAdapter'
 import { laneAxis } from './lanes'
+import { radialLayout } from './radialLayout'
 
 /** Space between neighbouring nodes in one layer (along the cross axis). */
 export const LAYER_GAP = 40
@@ -36,16 +39,13 @@ export type AutoLayoutDocument = Pick<GraphDocument, 'nodes' | 'edges' | 'edgeTy
 
 /**
  * New top-left positions for every tree node (D3), rounded to whole units. Other nodes are left
- * out (they don't move, D10). Empty in radial mode (that layout comes in P4-6) or without tree
- * nodes. `sizeOf` gives a node's size on screen.
+ * out (they don't move, D10). Empty without tree nodes. `sizeOf` gives a node's size on screen.
  */
 export function autoLayout(
   doc: AutoLayoutDocument,
   sizeOf: (node: GraphNode) => Size,
 ): Map<string, Position> {
   const result = new Map<string, Position>()
-  const axis = laneAxis(doc.layout.direction)
-  if (axis === null) return result
   const tree = treeNodeIds(doc)
   const nodes = doc.nodes.filter((n) => tree.has(n.id))
   if (nodes.length === 0) return result
@@ -53,9 +53,11 @@ export function autoLayout(
   const edges = prerequisiteEdges(doc) // both ends are tree nodes (D3)
   const kept = withoutLoopEdges(nodes, edges)
   const rank = ranks(doc, nodes, kept)
+  const sizes = new Map(nodes.map((n) => [n.id, sizeOf(n)]))
+  const axis = laneAxis(doc.layout.direction)
+  if (axis === null) return radialLayout(nodes, kept, rank, sizes, doc.layout.spacing, LAYER_GAP)
 
   // Size along the cross axis (spread within a layer) and the main axis (across layers).
-  const sizes = new Map(nodes.map((n) => [n.id, sizeOf(n)]))
   const crossSize = (id: string) => {
     const s = sizes.get(id)
     return s ? (axis === 'y' ? s.width : s.height) : 0 // stand-ins have no size

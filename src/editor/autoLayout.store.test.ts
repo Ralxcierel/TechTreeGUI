@@ -53,15 +53,22 @@ describe('autoLayout (store)', () => {
     expect(node(a).position).toEqual({ x: -100, y: 75 })
   })
 
-  it('does nothing in play mode or in radial mode', () => {
+  it('does nothing in play mode', () => {
     setUp()
     s().setPlaying(true)
     const doc = s().doc
     expect(s().autoLayout()).toEqual([])
     expect(s().doc).toBe(doc)
-    s().setPlaying(false)
+  })
+
+  it('lays the tree out in rings in radial mode', () => {
+    const { a, b } = setUp()
     s().setLayoutDirection('radial')
-    expect(autoLayoutMoves(s()).size).toBe(0)
+    expect(s().autoLayout()).toEqual([a, b])
+    // The single root in the centre. Its only child's slice is the whole circle starting at
+    // 12 o'clock, so the child sits in the middle of it: straight down, on ring 1 (spacing 250).
+    expect(node(a).position).toEqual({ x: -110, y: -30 })
+    expect(node(b).position).toEqual({ x: -110, y: 220 })
   })
 })
 
