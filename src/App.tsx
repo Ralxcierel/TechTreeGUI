@@ -1,4 +1,5 @@
 import { ReactFlowProvider } from '@xyflow/react'
+import { AutosaveNotices } from './components/AutosaveNotices'
 import { Canvas } from './components/Canvas'
 import { Inspector } from './components/inspector/Inspector'
 import { Library } from './components/library/Library'
@@ -14,6 +15,7 @@ export default function App() {
     <ReactFlowProvider>
       <div className="app">
         <Toolbar />
+        <AutosaveNotices />
         <div className="workspace">
           <Library />
           <Canvas />

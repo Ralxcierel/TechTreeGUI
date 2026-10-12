@@ -215,6 +215,8 @@ interface EditorState {
   setDocumentName: (name: string) => void
   /** Replaces the open document (after Load); it counts as saved. */
   loadDocument: (doc: GraphDocument) => void
+  /** Like `loadDocument`, but the document counts as unsaved (autosave recovery, P5-1). */
+  restoreDocument: (doc: GraphDocument) => void
   /** Starts a fresh, empty document. */
   newDocument: () => void
   hasUnsavedChanges: () => boolean
@@ -515,6 +517,25 @@ function restore(s: EditorState, doc: GraphDocument): Partial<EditorState> {
   return { ...derive(s, doc, ui), editing, expandedNodeIds }
 }
 
+/** The state after opening a document (Load, New, autosave recovery): saved, no history. */
+function loaded(s: EditorState, doc: GraphDocument): Partial<EditorState> {
+  dragGroup = null
+  const ui = uiForLoadedDocument(doc, s.doc, s.ui)
+  return {
+    doc,
+    savedDoc: doc,
+    ui,
+    flowNodes: toFlowNodes(doc, ui),
+    activeEdgeTypeId: null,
+    activeNodeTypeId: null,
+    expandedNodeIds: new Set(),
+    editing: null,
+    playing: false,
+    unlockedIds: new Set(),
+    history: emptyHistory(), // no undo across New or Load (D12)
+  }
+}
+
 export const useEditorStore = create<EditorState>()((rawSet, get) => {
   /**
    * Every action changes the store through this `set`. When an update changes the document and
@@ -789,24 +810,10 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
     },
     setDocumentName: (name) =>
       inGroup('name', () => set((s) => derive(s, renameDocument(s.doc, name), s.ui))),
-    loadDocument: (doc) =>
-      set((s) => {
-        dragGroup = null
-        const ui = uiForLoadedDocument(doc, s.doc, s.ui)
-        return {
-          doc,
-          savedDoc: doc,
-          ui,
-          flowNodes: toFlowNodes(doc, ui),
-          activeEdgeTypeId: null,
-          activeNodeTypeId: null,
-          expandedNodeIds: new Set(),
-          editing: null,
-          playing: false,
-          unlockedIds: new Set(),
-          history: emptyHistory(), // no undo across New or Load (D12)
-        }
-      }),
+    loadDocument: (doc) => set((s) => loaded(s, doc)),
+    restoreDocument: (doc) =>
+      // A copy is never the open document, so there are unsaved changes until the next Save.
+      set((s) => ({ ...loaded(s, doc), savedDoc: { ...doc } })),
     newDocument: () => get().loadDocument(createEmptyDocument()),
     hasUnsavedChanges: () => get().doc !== get().savedDoc,
     markSaved: (viewport) => {

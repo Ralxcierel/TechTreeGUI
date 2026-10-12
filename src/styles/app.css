@@ -115,6 +115,21 @@ body,
   cursor: pointer;
 }
 
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--warning) 18%, var(--panel));
+  border-bottom: 1px solid var(--warning);
+}
+
+.recovery-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
 .workspace {
   display: flex;
   flex: 1;
