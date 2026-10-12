@@ -309,6 +309,17 @@ function nodeSize(doc: GraphDocument, ui: UiState, node: GraphDocument['nodes'][
   return { width, height: 60 }
 }
 
+/** The boxes of the given nodes (positions and sizes as `nodeSize` gives them), in flow units. */
+export function selectNodeBoxes(
+  s: Pick<EditorState, 'doc' | 'ui'>,
+  ids: readonly string[],
+): { position: Position; size: Size }[] {
+  const wanted = new Set(ids)
+  return s.doc.nodes
+    .filter((n) => wanted.has(n.id))
+    .map((n) => ({ position: n.position, size: nodeSize(s.doc, s.ui, n) }))
+}
+
 /** Cached inputs and result of `selectProblems`. */
 let problemsCache: {
   doc: GraphDocument

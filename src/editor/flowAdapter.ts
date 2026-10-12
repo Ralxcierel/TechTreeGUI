@@ -327,3 +327,22 @@ export function paneCenter(
 ): Position {
   return { x: (width / 2 - x) / zoom, y: (height / 2 - y) / zoom }
 }
+
+/**
+ * Whether any of the boxes (flow coordinates) is at least partly inside a pane of `width` ×
+ * `height` pixels with the given viewport transform.
+ */
+export function anyBoxInView(
+  boxes: readonly { position: Position; size: Size }[],
+  width: number,
+  height: number,
+  [x, y, zoom]: readonly [number, number, number],
+): boolean {
+  return boxes.some(({ position, size }) => {
+    const left = position.x * zoom + x
+    const top = position.y * zoom + y
+    return (
+      left < width && left + size.width * zoom > 0 && top < height && top + size.height * zoom > 0
+    )
+  })
+}

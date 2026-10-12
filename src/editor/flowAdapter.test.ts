@@ -10,6 +10,7 @@ import {
 } from '../model'
 import {
   emptyUi,
+  anyBoxInView,
   paneCenter,
   reduceEdgeChanges,
   reduceNodeChanges,
@@ -381,5 +382,27 @@ describe('paneCenter', () => {
   it('undoes pan and zoom', () => {
     expect(paneCenter(800, 600, [0, 0, 1])).toEqual({ x: 400, y: 300 })
     expect(paneCenter(800, 600, [100, 50, 2])).toEqual({ x: 150, y: 125 })
+  })
+})
+
+describe('anyBoxInView', () => {
+  const box = (x: number, y: number) => ({
+    position: { x, y },
+    size: { width: 100, height: 50 },
+  })
+  it('is true when any box overlaps the pane, after pan and zoom', () => {
+    expect(anyBoxInView([box(-99, 0)], 800, 600, [0, 0, 1])).toBe(true) // 1 px inside
+    expect(anyBoxInView([box(-100, 0)], 800, 600, [0, 0, 1])).toBe(false) // touching the edge
+    expect(anyBoxInView([box(799, 599)], 800, 600, [0, 0, 1])).toBe(true)
+    expect(anyBoxInView([box(800, 0)], 800, 600, [0, 0, 1])).toBe(false)
+    expect(anyBoxInView([box(1000, 0), box(10, 10)], 800, 600, [0, 0, 1])).toBe(true)
+    // Panned 500 px left at zoom 2: x 300 is on screen at 100.
+    expect(anyBoxInView([box(300, 0)], 800, 600, [-500, 0, 2])).toBe(true)
+    expect(anyBoxInView([box(0, 0)], 800, 600, [-500, 0, 2])).toBe(false)
+    expect(anyBoxInView([box(0, 400)], 800, 600, [0, 0, 2])).toBe(false) // 800 px down
+  })
+  it('is false without boxes or with an empty pane', () => {
+    expect(anyBoxInView([], 800, 600, [0, 0, 1])).toBe(false)
+    expect(anyBoxInView([box(0, 0)], 0, 0, [0, 0, 1])).toBe(false)
   })
 })

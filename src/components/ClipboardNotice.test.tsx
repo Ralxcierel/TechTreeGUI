@@ -1,13 +1,27 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ReactFlowProvider, useStoreApi } from '@xyflow/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEditorStore } from '../editor/store'
 import { ClipboardNotice } from './ClipboardNotice'
+
+// (vi.hoisted: vi.mock is moved above the imports, so what it uses must be created there too.)
+const { fitView, getZoom } = vi.hoisted(() => ({
+  fitView: vi.fn(() => Promise.resolve(true)),
+  getZoom: () => 0.8, // the same function every render, like React Flow's
+}))
+vi.mock('@xyflow/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@xyflow/react')>()),
+  useReactFlow: () => ({ fitView, getZoom }),
+}))
 
 const store = useEditorStore
 const s = () => store.getState()
 
-beforeEach(() => store.setState(store.getInitialState(), true))
+beforeEach(() => {
+  store.setState(store.getInitialState(), true)
+  fitView.mockClear()
+})
 afterEach(() => {
   cleanup()
   window.getSelection()?.removeAllRanges()
@@ -27,13 +41,21 @@ function clipboardEvent(type: 'copy' | 'cut' | 'paste', target: Element, text = 
   return { handled: !notPrevented, text: data.get('text/plain') }
 }
 
+/** React Flow's own store, to set the pane size and viewport. */
+let flow: ReturnType<typeof useStoreApi> | null = null
+function FlowStore({ onStore }: { onStore: (api: ReturnType<typeof useStoreApi>) => void }) {
+  onStore(useStoreApi())
+  return null
+}
+
 function show() {
   render(
-    <div>
+    <ReactFlowProvider>
+      <FlowStore onStore={(api) => (flow = api)} />
       <ClipboardNotice />
       <input aria-label="name" />
       <p>Some page text</p>
-    </div>,
+    </ReactFlowProvider>,
   )
 }
 function twoNodes() {
@@ -54,6 +76,25 @@ describe('clipboard events', () => {
     const paste = clipboardEvent('paste', document.body, copy.text)
     expect(paste.handled).toBe(true)
     expect(s().doc.nodes).toHaveLength(4)
+  })
+
+  it('pans to pasted nodes only when none of them would be in view', () => {
+    show()
+    twoNodes() // at x 0 and 200, y 0
+    const { text } = clipboardEvent('copy', document.body)
+    act(() => flow!.setState({ width: 800, height: 600, transform: [0, 0, 1] }))
+    clipboardEvent('paste', document.body, text) // lands at 40, 40: in view
+    expect(fitView).not.toHaveBeenCalled()
+    act(() => flow!.setState({ transform: [-5000, 0, 1] })) // panned far away
+    clipboardEvent('paste', document.body, text)
+    const pasted = [...s().ui.selectedNodeIds]
+    expect(fitView).toHaveBeenCalledOnce()
+    expect(fitView).toHaveBeenCalledWith({
+      nodes: pasted.map((id) => ({ id })),
+      padding: 0.2,
+      maxZoom: 0.8,
+      duration: 300,
+    })
   })
 
   it('cut removes the nodes', () => {
