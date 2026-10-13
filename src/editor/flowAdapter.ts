@@ -3,6 +3,7 @@ import { MarkerType, type Edge, type EdgeChange, type Node, type NodeChange } fr
 import {
   deleteEdges,
   deleteNodes,
+  FRAME_FLOW_PREFIX,
   HANDLE_SIDES,
   moveFrames,
   moveNodes,
@@ -40,7 +41,7 @@ export type FrameFlowNode = Node<FrameNodeData, 'frame'>
 export type CanvasNode = FlowNode | FrameFlowNode
 
 /** Frames' React Flow ids get this prefix, so they can never clash with node ids. */
-export const FRAME_PREFIX = 'frame:'
+export const FRAME_PREFIX = FRAME_FLOW_PREFIX
 export const frameFlowId = (frameId: string) => FRAME_PREFIX + frameId
 /** The frame id behind a React Flow id, or null for a node. */
 export const frameIdOf = (flowId: string) =>

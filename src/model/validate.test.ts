@@ -295,6 +295,11 @@ describe('validateDocument', () => {
       'frames[0].size must be an object.',
     ],
     [
+      'node id reserved for frames',
+      (d: ReturnType<typeof fixture>) => (d.nodes[0].id = 'frame:f1'),
+      'nodes[0].id must not start with "frame:" (reserved for frames).',
+    ],
+    [
       'duplicate frame id',
       (d: ReturnType<typeof fixture>) =>
         (d.frames = [

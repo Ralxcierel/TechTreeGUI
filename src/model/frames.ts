@@ -3,6 +3,12 @@
 import { newFrameId } from './ids'
 import type { Frame, GraphDocument, Position } from './types'
 
+/**
+ * The editor shows frames as React Flow nodes with this prefix before their id, so node ids may
+ * not start with it (checked on load).
+ */
+export const FRAME_FLOW_PREFIX = 'frame:'
+
 export const FRAME_COLOR = '#38bdf8'
 export const FRAME_TITLE = 'Frame'
 /** Room left around the nodes when a frame is drawn around them. */

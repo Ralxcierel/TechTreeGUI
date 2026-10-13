@@ -5,6 +5,7 @@
 // - Keys the app doesn't know are kept on every object, so they survive a save (S5).
 import { isFiniteNumber, isPlainObject } from './guards'
 import { fieldValueProblem } from './fieldValues'
+import { FRAME_FLOW_PREFIX } from './frames'
 import { connectionError } from './operations'
 import {
   CURRENT_SCHEMA_VERSION,
@@ -343,7 +344,10 @@ function readEdgeType(r: Reader, value: unknown, path: string): EdgeType | undef
 function readNode(r: Reader, value: unknown, path: string): GraphNode | undefined {
   const o = r.object(value, path)
   if (!o) return undefined
-  const id = r.id(o, 'id', path)
+  let id = r.id(o, 'id', path)
+  if (id?.startsWith(FRAME_FLOW_PREFIX)) {
+    id = r.fail(`${path}.id`, `must not start with "${FRAME_FLOW_PREFIX}" (reserved for frames).`)
+  }
   const typeId = r.id(o, 'typeId', path)
   const pos = r.object(o.position, `${path}.position`)
   const x = pos && r.number(pos, 'x', `${path}.position`)
