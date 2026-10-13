@@ -1234,3 +1234,29 @@ body,
 .minimap-frame {
   opacity: 0.35;
 }
+
+/* A small drop-down menu under a toolbar button (the Export menu, P5-5). */
+.menu {
+  position: relative;
+}
+
+.menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 170px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+
+.menu__list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}

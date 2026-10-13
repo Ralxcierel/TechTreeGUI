@@ -7,6 +7,7 @@ import { EMPTY_FRAME_SIZE, parseDocument, serialize } from '../model'
 import { AutoLayoutButton } from './AutoLayoutButton'
 import { HistoryButtons } from './HistoryButtons'
 import { ErrorBanner, type BannerMessage } from './ErrorBanner'
+import { ExportMenu } from './ExportMenu'
 import { PlayBar } from './PlayBar'
 
 const STACK_OFFSET = 24
@@ -126,6 +127,7 @@ export function Toolbar() {
         <AutoLayoutButton />
         <button onClick={handleSave}>Save</button>
         <button onClick={handleLoadClick}>Load</button>
+        <ExportMenu onError={setError} />
         <input
           ref={fileInput}
           type="file"

@@ -261,3 +261,31 @@ describe('frames and the clipboard (Q6)', () => {
     ])
   })
 })
+
+describe('setSelection', () => {
+  it('sets exactly the given nodes, edges and frames, dropping unknown ids', () => {
+    const { a, b, outer } = scene()
+    s().connect({ source: a, target: b, sourceHandle: null, targetHandle: null })
+    const edge = s().doc.edges[0]!.id
+    s().setSelection({ nodeIds: [a, 'gone'], edgeIds: [edge, 'x'], frameIds: [outer, 'y'] })
+    expect([...s().ui.selectedNodeIds]).toEqual([a])
+    expect([...s().ui.selectedEdgeIds]).toEqual([edge])
+    expect([...s().ui.selectedFrameIds]).toEqual([outer])
+    expect(
+      s()
+        .flowNodes.filter((n) => n.selected)
+        .map((n) => n.id),
+    ).toEqual([frameFlowId(outer), a])
+  })
+
+  it("doesn't end an undo group or close an open type", () => {
+    const { a, outer } = scene()
+    s().updateFrame(outer, { title: 'E' })
+    const steps = s().history.past.length
+    s().editNodeType('technology')
+    s().setSelection({ nodeIds: [a], edgeIds: [], frameIds: [] })
+    s().updateFrame(outer, { title: 'Ea' }) // still the same typing step
+    expect(s().history.past.length).toBe(steps)
+    expect(s().editing).toEqual({ kind: 'nodeType', id: 'technology' })
+  })
+})

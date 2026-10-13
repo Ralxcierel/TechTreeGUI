@@ -164,6 +164,12 @@ interface EditorState {
   /** Selects every node (not mid-drag). */
   selectAll: () => void
   /**
+   * Sets the canvas selection exactly (ids that no longer exist are dropped), without ending an
+   * undo group or closing an open type: for putting a selection back (e.g. after a picture
+   * export took it away).
+   */
+  setSelection: (selection: Selection) => void
+  /**
    * Adds a frame (D8) around the selected nodes, or with `fallback`'s box when none are selected,
    * and selects it. Returns its id; null in play mode.
    */
@@ -286,6 +292,12 @@ interface EditorState {
   hasUnsavedChanges: () => boolean
   /** Records the current viewport, stamps `meta.modified`, and returns the document to write. */
   markSaved: (viewport: Viewport) => GraphDocument
+}
+
+export interface Selection {
+  nodeIds: Iterable<string>
+  edgeIds: Iterable<string>
+  frameIds: Iterable<string>
 }
 
 export interface SearchState {
@@ -1083,6 +1095,20 @@ export const useEditorStore = create<EditorState>()((rawSet, get) => {
       inGroup(`frame:${frameId}:${patchKeys(patch)}`, () =>
         set((s) => (s.playing ? s : derive(s, updateFrame(s.doc, frameId, patch), s.ui))),
       ),
+    setSelection: ({ nodeIds, edgeIds, frameIds }) =>
+      set((s) => {
+        const keep = (ids: Iterable<string>, known: { id: string }[]) => {
+          const existing = new Set(known.map((k) => k.id))
+          return new Set([...ids].filter((id) => existing.has(id)))
+        }
+        const ui = {
+          ...s.ui,
+          selectedNodeIds: keep(nodeIds, s.doc.nodes),
+          selectedEdgeIds: keep(edgeIds, s.doc.edges),
+          selectedFrameIds: keep(frameIds, s.doc.frames),
+        }
+        return derive(s, s.doc, ui)
+      }),
     setSearch: (patch) => set((s) => ({ search: { ...s.search, ...patch } })),
     goToMatch: (direction) => {
       const s = get()

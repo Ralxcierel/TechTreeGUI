@@ -8,4 +8,9 @@ describe('fileNameFor', () => {
     expect(fileNameFor('  ')).toBe('Untitled.json')
     expect(fileNameFor('Technologie é')).toBe('Technologie é.json')
   })
+
+  it('takes another ending', () => {
+    expect(fileNameFor('Tree', 'game.json')).toBe('Tree.game.json')
+    expect(fileNameFor('a/b', 'png')).toBe('a_b.png')
+  })
 })
