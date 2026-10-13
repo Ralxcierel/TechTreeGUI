@@ -2,10 +2,10 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (2026-10-12, Phase 5 approved; final PR phase2 → main)
+## Resume here (session ended 2026-10-13: all phases done; final PR phase2 → main NOT opened yet)
 1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (954 tests at hand-off).
 2. `docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). **DESIGN Phase 5 approved 2026-10-12 (all of P5-0 to P5-6).** Nothing is half-done.
-3. All phases in `docs/DESIGN.md` §5 are complete. The developer asked (2026-10-12) to open the end-of-project PR `phase2` → `main`; see "Final PR" below for its state. After that, "Later / maybe" items (Tauri desktop packaging, theming, multiple documents) would each need a new plan (walking-skeleton method) — ask the developer first.
+3. All phases in `docs/DESIGN.md` §5 are complete. **Next step: open the end-of-project PR `phase2` → `main`** (the developer asked for it 2026-10-12; it couldn't be opened from the session, see "Final PR" below). After that, "Later / maybe" items (Tauri desktop packaging, theming, multiple documents) would each need a new plan (walking-skeleton method) — ask the developer first.
 4. DESIGN Phases 1–5 are complete and approved.
 5. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
 6. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
@@ -19,8 +19,11 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
    - 2026-10-11: with no emulation the pane was only 402 px wide, and the canvas then has zero width (so fit/visibility can't be checked there); 1280×720 emulation with the ÷ 1.6 mapping worked again.
    - 2026-10-12: the pane's simulated Ctrl+C/Ctrl+V don't fire the browser's copy/paste events: dispatch `new ClipboardEvent('copy'|'paste', { clipboardData: new DataTransfer(), bubbles: true, cancelable: true })` on `document.body` instead. Modifiers are not passed with clicks or drags (Shift+drag box selection and Ctrl+click don't work; real Ctrl+A does). React Flow's **lock** (Toggle Interactivity) button sits just below Fit View in the Controls: a stray click there turns off selecting/dragging (looks like a bug; click it again). Downloads: replace `HTMLAnchorElement.prototype.click` and wrap `URL.createObjectURL` to catch the blob (the app revokes the URL after 1 s). Frame resize handles are 7 px: aim from fresh `getBoundingClientRect` numbers, or the title strip next to them gets the drag.
 
-## Final PR
-- `gh` is not installed on this machine (2026-10-12); the PR `phase2` → `main` is opened through github.com (compare page) instead. Repo: `Ralxcierel/TechTreeGUI`.
+## Final PR (not opened yet)
+- Repo `Ralxcierel/TechTreeGUI`; `main` ends at PR #3 (merged up to P3-3). Everything since is on `phase2`, pushed and in sync with `origin/phase2`.
+- `gh` is not installed on this machine, and the browser pane is not signed in to GitHub (the agent can't sign in). The developer was offered three ways (2026-10-12) and closed the session without choosing: (1) sign in to GitHub in the browser pane, then the agent fills in and submits the compare page; (2) the developer opens https://github.com/Ralxcierel/TechTreeGUI/compare/main...phase2?expand=1 and pastes the text; (3) install the GitHub CLI (a system change: only with the developer's go-ahead; they log it in themselves). Ask again.
+- Prepared title: `DESIGN Phases 3 (from P3-4) to 5: rich content, tech-tree features, quality of life`.
+- Prepared body (summary): everything on `phase2` since PR #3; Phase 3 rest (P3-4 named handles, schema v3; P3-5 gate); Phase 4 (cycle detection, validation and Problems panel; play mode; schema v4 layout and tiers with lanes/rings and snapping; linear and radial auto-layout); Phase 5 (undo/redo; autosave and recovery; copy/cut/paste/duplicate/select all; search and filter; frames, schema v5; PNG/SVG and game-JSON export); notes: schema v5 with migrations from v1–v4, one new dependency `html-to-image` 1.11.11 (approved D9), tests/lint/build pass; ends with the Claude Code attribution line. After opening it, use the ccd_pr tools (`get_status`, `bind_pr`) to watch its CI.
 
 ## Where we are
 - **DESIGN Phase 5 (quality of life) is complete and approved** (2026-10-12). Plan `docs/PLAN-phase5.md`. Note: the plan's §5 assumption "search cleared on New/Load" was superseded by the developer's P5-3 choice (kept across New/Load).
@@ -29,7 +32,7 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
   - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
 - **DESIGN Phase 3 is complete and approved** (2026-10-09). Plan `docs/PLAN-phase3.md`; all of P3-0 to P3-5 approved. The developer chose to keep the "no generic side dot under a centred named handle" behaviour from P3-4.
 - DESIGN Phases 1 and 2 are complete and approved.
-- **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
+- **PRs wait until the end of the project** (developer, 2026-10-08). `main` has everything up to P3-3 (PRs #1–#3). Everything later is only on `phase2`: the final PR `phase2` → `main` is now due (see "Final PR").
 
 ## Done (DESIGN Phase 5, complete)
 - **P5-6 Phase 5 gate** (commit `1d17842`, approved 2026-10-12):
