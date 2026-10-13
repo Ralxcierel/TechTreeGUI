@@ -2,11 +2,11 @@
 
 _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`. Scope: `docs/DESIGN.md`._
 
-## Resume here (2026-10-12, at the Phase 5 gate)
+## Resume here (2026-10-12, Phase 5 approved; final PR phase2 → main)
 1. Read this file first. Then `git fetch && git checkout phase2 && git pull`, `npm install`, and check that `npm test`, `npm run lint` and `npm run build` pass (954 tests at hand-off).
-2. `docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). P5-0 to P5-5 approved 2026-10-12. **Waiting on the developer: approval of the Phase 5 gate (P5-6, commit `1d17842`), i.e. DESIGN Phase 5 as complete.** Nothing is half-done.
-3. Phase 5 is the last phase in `docs/DESIGN.md` §5 (only "Later / maybe": Tauri desktop packaging, theming, multiple documents). After approval, ask the developer what's next: the end-of-project PR `phase2` → `main` (PRs were deferred to the end, 2026-10-08), and/or planning a "Later / maybe" item (a new plan with the walking-skeleton method).
-4. DESIGN Phases 1–4 are complete and approved (Phase 4 on 2026-10-12).
+2. `docs/PLAN-phase5.md` approved 2026-10-12 ("recommended for all", incl. the `html-to-image` 1.11.11 dependency (D9) and schema v5 `frames` (D7)). **DESIGN Phase 5 approved 2026-10-12 (all of P5-0 to P5-6).** Nothing is half-done.
+3. All phases in `docs/DESIGN.md` §5 are complete. The developer asked (2026-10-12) to open the end-of-project PR `phase2` → `main`; see "Final PR" below for its state. After that, "Later / maybe" items (Tauri desktop packaging, theming, multiple documents) would each need a new plan (walking-skeleton method) — ask the developer first.
+4. DESIGN Phases 1–5 are complete and approved.
 5. The untracked `Screenshot 2026-10-10 005017.png` in the repo root: the developer said to leave it (2026-10-11). Don't commit or delete it.
 6. If `npm run dev` shows a stale UI or reports missing exports after edits, restart the dev server. Vite missed rewrites on this Windows machine many times (files written from the shell); the browser pane's console can also show old errors from earlier edits, so check timestamps.
 7. Shell gotchas: in Bash heredocs on this machine, `\n` or `\u…` inside Python string literals became real characters or broke the script (hit again 2026-10-10); a long heredoc also failed with "unexpected EOF". Never start a Bash command with a bare `cat > file` before a heredoc meant for another program: it waits for input forever (2026-10-11). For bigger edits write a Python script to the scratchpad with the Write tool and run it with `python -I <path>`; use the Edit tool for lines with escapes.
@@ -19,8 +19,11 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
    - 2026-10-11: with no emulation the pane was only 402 px wide, and the canvas then has zero width (so fit/visibility can't be checked there); 1280×720 emulation with the ÷ 1.6 mapping worked again.
    - 2026-10-12: the pane's simulated Ctrl+C/Ctrl+V don't fire the browser's copy/paste events: dispatch `new ClipboardEvent('copy'|'paste', { clipboardData: new DataTransfer(), bubbles: true, cancelable: true })` on `document.body` instead. Modifiers are not passed with clicks or drags (Shift+drag box selection and Ctrl+click don't work; real Ctrl+A does). React Flow's **lock** (Toggle Interactivity) button sits just below Fit View in the Controls: a stray click there turns off selecting/dragging (looks like a bug; click it again). Downloads: replace `HTMLAnchorElement.prototype.click` and wrap `URL.createObjectURL` to catch the blob (the app revokes the URL after 1 s). Frame resize handles are 7 px: aim from fresh `getBoundingClientRect` numbers, or the title strip next to them gets the drag.
 
+## Final PR
+- `gh` is not installed on this machine (2026-10-12); the PR `phase2` → `main` is opened through github.com (compare page) instead. Repo: `Ralxcierel/TechTreeGUI`.
+
 ## Where we are
-- **DESIGN Phase 5 (quality of life): all increments built; P5-0 to P5-5 approved 2026-10-12; the P5-6 gate is done and waiting for the developer's approval.** Plan `docs/PLAN-phase5.md`. Note: the plan's §5 assumption "search cleared on New/Load" was superseded by the developer's P5-3 choice (kept across New/Load).
+- **DESIGN Phase 5 (quality of life) is complete and approved** (2026-10-12). Plan `docs/PLAN-phase5.md`. Note: the plan's §5 assumption "search cleared on New/Load" was superseded by the developer's P5-3 choice (kept across New/Load).
 - **DESIGN Phase 4 (tech-tree features) is complete and approved** (2026-10-12). `docs/PLAN-phase4.md` approved 2026-10-10 with D1–D12 and the recommended answers to Q1–Q5 (Q1 inference, Q2 no OR, Q3 `cost` key, Q4 no Era link, Q5 yes, in P4-4). Summary:
   - Skeleton P4-0: cycle detection on prerequisite edges → Problems panel → marked cards (no schema change).
   - Then P4-1 full validation, P4-2 play mode, P4-3 schema v4 (`layout: { direction, spacing, tiers }` + `nodes[].tierId`, with migration), P4-4 tier lanes and snapping, P4-5 linear auto-layout (hand-written, no new dependency), P4-6 radial, P4-7 gate.
@@ -28,8 +31,8 @@ _Snapshot for the next session. Overwrite it; don't append. Plan: `docs/PLAN.md`
 - DESIGN Phases 1 and 2 are complete and approved.
 - **PRs wait until the end of the project** (developer, 2026-10-08). `main` has Phase 1 and P2-0 to P2-2 (PRs #1 and #2). Everything later is only on `phase2`: one PR `phase2` → `main` is due at the end.
 
-## Done (DESIGN Phase 5, waiting for gate approval)
-- **P5-6 Phase 5 gate** (commit `1d17842`, waiting for the developer's approval):
+## Done (DESIGN Phase 5, complete)
+- **P5-6 Phase 5 gate** (commit `1d17842`, approved 2026-10-12):
   - `src/editor/phase5.acceptance.test.ts` automates `docs/PLAN-phase5.md` §1 through store actions: (1) five different changes (add, drag ending in a lane snap, typed word, connect, Delete of a node with its edge) are exactly five steps; five undos give the saved document object (unsaved cleared), five redos the "after" object. (2) Three linked nodes (two edge types, a custom node type) pasted with new ids, +40, selected (checked from the document, not paste's return), edges and types; Duplicate one step, placed and selected; paste into New brings both types. (3) Frame around nodes, titled, header drag moves frame and its nodes only, resize, recolour, save → reset → load byte-identical as v5. (4) "bronze" matches/dims, "military" 3 → 2 with Branch, Enter steps and wraps. (5) Game export keys, tiers, exact node/edge types and nodes, no styles/view/frames/placements. (6) Autosave with fake storage: reload offers recovery, Restore is exact and unsaved; after Save a reload doesn't ask.
   - Independent review of the test (1 round, no bugs): three product mutations went undetected (drag group, duplicate placement/selection, empty export types) — tightened, and all three now fail the test (checked by mutating and restoring); also a tautological selection check, the frame's own move, edge type absent before the New paste, export preconditions, drag state reset between tests.
   - **Hand check in the browser (1280×720), real mouse and keys except where noted:**
