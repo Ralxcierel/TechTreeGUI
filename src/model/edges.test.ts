@@ -58,10 +58,21 @@ describe('connectionError', () => {
     expect(connectionError(twoNodes(), { ...ab, target: 'a' })).toMatch(/itself/)
   })
 
-  it('rejects exact duplicates, even with different handles', () => {
-    const first = connect(twoNodes(), ab)
+  it('rejects exact duplicates (same ends, type and handles)', () => {
+    const first = connect(twoNodes(), { ...ab, sourceHandle: 'x' })
     if (!first.ok) throw new Error(first.error)
     expect(connectionError(first.doc, { ...ab, sourceHandle: 'x' })).toMatch(/already connected/)
+    // An omitted handle counts as null, like the stored one.
+    const second = connect(twoNodes(), { ...ab, targetHandle: null })
+    if (!second.ok) throw new Error(second.error)
+    expect(connectionError(second.doc, ab)).toMatch(/already connected/)
+  })
+
+  it('allows the same two nodes and type again through other handles', () => {
+    const first = connect(twoNodes(), ab)
+    if (!first.ok) throw new Error(first.error)
+    expect(connectionError(first.doc, { ...ab, sourceHandle: 'x' })).toBeNull()
+    expect(connectionError(first.doc, { ...ab, targetHandle: 'y' })).toBeNull()
   })
 
   it('rejects unknown nodes and edge types', () => {

@@ -42,6 +42,7 @@ export function createNodeType(
     name,
     style: { ...defaultNodeType().style },
     fields: [{ key: 'title', label: 'Name', kind: 'text', default: `New ${name}`, show: ['card'] }],
+    handles: [],
   }
   return { doc: { ...doc, nodeTypes: [...doc.nodeTypes, type] }, id }
 }

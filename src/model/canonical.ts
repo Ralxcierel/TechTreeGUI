@@ -16,15 +16,26 @@ const position: Shape = { keys: ['x', 'y'] }
 const nodeStyleKeys = ['shape', 'width', 'fill', 'border', 'icon'] as const
 
 const DOCUMENT: Shape = {
-  keys: ['schemaVersion', 'meta', 'nodeTypes', 'edgeTypes', 'nodes', 'edges', 'view'],
+  keys: [
+    'schemaVersion',
+    'meta',
+    'nodeTypes',
+    'edgeTypes',
+    'nodes',
+    'edges',
+    'frames',
+    'layout',
+    'view',
+  ],
   children: {
     meta: { keys: ['name', 'created', 'modified'] },
     nodeTypes: [
       {
-        keys: ['id', 'name', 'style', 'fields'],
+        keys: ['id', 'name', 'style', 'fields', 'handles'],
         children: {
           style: { keys: nodeStyleKeys },
           fields: [{ keys: ['key', 'label', 'kind', 'default', 'options', 'show'] }],
+          handles: [{ keys: ['id', 'label', 'side', 'offset', 'direction'] }],
         },
       },
     ],
@@ -36,11 +47,21 @@ const DOCUMENT: Shape = {
     ],
     nodes: [
       {
-        keys: ['id', 'typeId', 'position', 'data', 'styleOverrides'],
+        keys: ['id', 'typeId', 'position', 'data', 'styleOverrides', 'tierId'],
         children: { position, styleOverrides: { keys: nodeStyleKeys } },
       },
     ],
     edges: [{ keys: ['id', 'typeId', 'source', 'target', 'sourceHandle', 'targetHandle'] }],
+    frames: [
+      {
+        keys: ['id', 'title', 'note', 'color', 'position', 'size'],
+        children: { position, size: { keys: ['width', 'height'] } },
+      },
+    ],
+    layout: {
+      keys: ['direction', 'spacing', 'tiers'],
+      children: { tiers: [{ keys: ['id', 'name'] }] },
+    },
     view: { keys: ['viewport'], children: { viewport: { keys: ['x', 'y', 'zoom'] } } },
   },
 }

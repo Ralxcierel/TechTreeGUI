@@ -1,6 +1,6 @@
 // What a node card shows: one line per field marked `card`, formatted by field kind (decision D6).
 // Pure, so the card component stays a thin renderer.
-import type { FieldDef, FieldKind, NodeType } from '../model'
+import type { FieldDef, FieldKind, GraphDocument, NodeType } from '../model'
 import { imageSource } from './images'
 
 export interface CardLine {
@@ -138,4 +138,37 @@ export function tooltipLines(nodeType: NodeType, values: Record<string, unknown>
 /** What a node's expanded section shows: its fields marked `expanded`. */
 export function expandedLines(nodeType: NodeType, values: Record<string, unknown>): FieldLine[] {
   return fieldLines(nodeType, values, 'expanded')
+}
+
+/** A readable name for a node: its card title, else its type name (else its id). */
+export function nodeName(doc: Pick<GraphDocument, 'nodes' | 'nodeTypes'>, nodeId: string): string {
+  return displayName(
+    doc,
+    doc.nodes.find((n) => n.id === nodeId),
+    nodeId,
+  )
+}
+
+/**
+ * `nodeName` for many nodes of one document: looks nodes up in a map built once, instead of
+ * searching the node list for each name.
+ */
+export function nodeNamer(doc: Pick<GraphDocument, 'nodes' | 'nodeTypes'>): (id: string) => string {
+  let nodes: Map<string, GraphDocument['nodes'][number]> | null = null
+  return (nodeId) => {
+    nodes ??= new Map(doc.nodes.map((n) => [n.id, n]))
+    return displayName(doc, nodes.get(nodeId), nodeId)
+  }
+}
+
+function displayName(
+  doc: Pick<GraphDocument, 'nodeTypes'>,
+  node: GraphDocument['nodes'][number] | undefined,
+  nodeId: string,
+): string {
+  if (!node) return nodeId
+  const type = doc.nodeTypes.find((t) => t.id === node.typeId)
+  if (!type) return nodeId
+  const title = cardLines(type, node.data).find((l) => l.title)
+  return title && title.text !== EMPTY ? title.text : type.name
 }

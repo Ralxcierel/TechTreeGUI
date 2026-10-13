@@ -1,22 +1,42 @@
 import { Position } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 import { chooseEnds, edgePath } from './edgePath'
-import type { Anchor } from './floatingEdge'
+import type { Anchor, Box } from './floatingEdge'
 
 const a: Anchor = { x: 0, y: 0, position: Position.Right }
 const b: Anchor = { x: 200, y: 100, position: Position.Left }
 
 describe('chooseEnds', () => {
-  const floating = { source: a, target: b }
-  const fixed: Anchor = { x: 5, y: 6, position: Position.Top }
+  // Two 100×50 boxes side by side: source centre (50, 25), target centre (350, 25).
+  const sourceBox: Box = { x: 0, y: 0, width: 100, height: 50 }
+  const targetBox: Box = { x: 300, y: 0, width: 100, height: 50 }
+  const end = (box: Box, fixed: Anchor | null = null) => ({ box, outline: 'rect' as const, fixed })
 
   it('floats both ends when neither names a handle', () => {
-    expect(chooseEnds(floating, null, null)).toEqual(floating)
+    expect(chooseEnds(end(sourceBox), end(targetBox))).toEqual({
+      source: { x: 100, y: 25, position: Position.Right },
+      target: { x: 300, y: 25, position: Position.Left },
+    })
   })
 
   it('uses the fixed handle position for each end that has one', () => {
-    expect(chooseEnds(floating, fixed, null)).toEqual({ source: fixed, target: b })
-    expect(chooseEnds(floating, null, fixed)).toEqual({ source: a, target: fixed })
+    const s: Anchor = { x: 50, y: 0, position: Position.Top }
+    const t: Anchor = { x: 350, y: 50, position: Position.Bottom }
+    expect(chooseEnds(end(sourceBox, s), end(targetBox, t))).toEqual({ source: s, target: t })
+  })
+
+  it("aims the floating end at the other end's fixed handle, not its centre", () => {
+    // A (made-up) fixed point straight above the source: the source now leaves through its top,
+    // not through its right side, which faces the target's centre.
+    const t: Anchor = { x: 50, y: -300, position: Position.Bottom }
+    const aimed = chooseEnds(end(sourceBox), end(targetBox, t))
+    expect(aimed.target).toBe(t)
+    expect(aimed.source).toEqual({ x: 50, y: 0, position: Position.Top })
+
+    const s: Anchor = { x: 350, y: 300, position: Position.Top }
+    const back = chooseEnds(end(sourceBox, s), end(targetBox))
+    expect(back.source).toBe(s)
+    expect(back.target).toEqual({ x: 350, y: 50, position: Position.Bottom })
   })
 })
 

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { ReactFlowProvider, type NodeProps } from '@xyflow/react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { FlowNode } from '../../editor/flowAdapter'
 import { useEditorStore } from '../../editor/store'
-import type { NodeStyle } from '../../model'
+import { addNode, connect, createEmptyDocument, type NodeStyle } from '../../model'
 import { GraphNode } from './GraphNode'
 
 const store = useEditorStore
@@ -28,6 +28,39 @@ function renderNode(
 }
 
 describe('GraphNode', () => {
+  it('is outlined when it matches the search, dimmed when not, and neither without one', () => {
+    // Search reads the document's node n1 (the card's own props don't take part).
+    const doc = addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1')
+    store.getState().loadDocument(doc)
+    const card = renderNode('technology', { title: 'New Technology' })
+    expect(card.className).not.toMatch(/graph-node--(match|dimmed)/)
+    act(() => store.getState().setSearch({ query: 'technology' }))
+    expect(card.className).toContain('graph-node--match')
+    act(() => store.getState().setSearch({ query: 'zzz' }))
+    expect(card.className).toContain('graph-node--dimmed')
+    expect(card.className).not.toContain('graph-node--match')
+  })
+
+  it('tells screen readers about a match', () => {
+    store
+      .getState()
+      .loadDocument(addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'))
+    renderNode('technology', { title: 'New Technology' })
+    expect(screen.queryByText('Matches the search.')).toBeNull()
+    act(() => store.getState().setSearch({ query: 'new' }))
+    expect(screen.getByText('Matches the search.').className).toBe('visually-hidden')
+  })
+
+  it('dims a node of a missing type during a search', () => {
+    store
+      .getState()
+      .loadDocument(addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'))
+    const card = renderNode('gone', {})
+    expect(card.className).toBe('graph-node graph-node--missing')
+    act(() => store.getState().setSearch({ query: 'zzz' }))
+    expect(card.className).toBe('graph-node graph-node--missing graph-node--dimmed')
+  })
+
   it('draws the type style and its title', () => {
     const card = renderNode('technology', { title: 'Fire' })
     expect(card.className).toContain('graph-node--rounded')
@@ -104,6 +137,7 @@ describe('GraphNode', () => {
             position: { x: 0, y: 0 },
             data: { title: 'Fire', era: 'Ancient', cost: 5, notes: 'a\nb' },
             styleOverrides: {},
+            tierId: null,
           },
         ],
       },
@@ -141,5 +175,104 @@ describe('GraphNode', () => {
   it('says so when the node type is unknown', () => {
     renderNode('gone', {})
     expect(screen.getByText('Unknown type')).toBeTruthy()
+  })
+})
+
+describe('GraphNode: prerequisite cycles', () => {
+  /** Loads a document with nodes n1 and n2, linked n1 → n2 and (if `loop`) back. */
+  function loadPair(loop: boolean) {
+    let doc = addNode(
+      addNode(createEmptyDocument(), 'technology', { x: 0, y: 0 }, 'n1'),
+      'technology',
+      { x: 0, y: 0 },
+      'n2',
+    )
+    const links = loop
+      ? [
+          ['n1', 'n2'],
+          ['n2', 'n1'],
+        ]
+      : [['n1', 'n2']]
+    for (const [source, target] of links) {
+      const result = connect(doc, { source: source!, target: target!, typeId: 'prereq' })
+      if (!result.ok) throw new Error(result.error)
+      doc = result.doc
+    }
+    store.getState().loadDocument(doc)
+  }
+
+  it('leaves nodes outside a cycle unmarked', () => {
+    loadPair(false)
+    expect(renderNode('technology', { title: 'Fire' }).className).not.toContain('graph-node--cycle')
+    expect(screen.queryByText(/prerequisite cycle/)).toBeNull()
+  })
+
+  it('marks a node that is part of a cycle, also for screen readers', () => {
+    loadPair(true)
+    expect(renderNode('technology', { title: 'Fire' }).className).toContain('graph-node--cycle')
+    expect(screen.getByText(/In a prerequisite cycle/).className).toBe('visually-hidden')
+  })
+})
+
+describe('GraphNode: play mode', () => {
+  /** Loads n1 → n2 (and a cycle p ⇄ q if asked), turns play mode on, and draws node `n1`. */
+  function playing(unlockN1 = false) {
+    let doc = createEmptyDocument()
+    for (const id of ['n1', 'n2']) doc = addNode(doc, 'technology', { x: 0, y: 0 }, id)
+    const result = connect(doc, { source: 'n1', target: 'n2', typeId: 'prereq' })
+    if (!result.ok) throw new Error(result.error)
+    store.getState().loadDocument(result.doc)
+    store.getState().setPlaying(true)
+    if (unlockN1) store.getState().togglePlayUnlock('n1')
+  }
+
+  it('shows an available root with its state, also for screen readers', () => {
+    playing()
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-available')
+    expect(screen.getByText(/Available: click or press Enter to unlock/).className).toBe(
+      'visually-hidden',
+    )
+    expect(document.querySelector('.graph-node__unlocked')).toBeNull()
+  })
+
+  it('shows an unlocked node with a check mark', () => {
+    playing(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-unlocked')
+    expect(screen.getByText(/Unlocked: click or press Enter to lock again/)).toBeTruthy()
+    expect(card.querySelector('.graph-node__unlocked')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it("can't edit the title while playing", () => {
+    playing()
+    renderNode('technology', { title: 'Fire' })
+    fireEvent.doubleClick(screen.getByText('Fire'))
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('shows play states instead of the cycle mark', () => {
+    let doc = createEmptyDocument()
+    for (const id of ['n1', 'n2']) doc = addNode(doc, 'technology', { x: 0, y: 0 }, id)
+    for (const [source, target] of [
+      ['n1', 'n2'],
+      ['n2', 'n1'],
+    ] as const) {
+      const result = connect(doc, { source, target, typeId: 'prereq' })
+      if (!result.ok) throw new Error(result.error)
+      doc = result.doc
+    }
+    store.getState().loadDocument(doc)
+    store.getState().setPlaying(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-blocked')
+    expect(card.className).not.toContain('graph-node--cycle')
+    expect(screen.queryByText(/In a prerequisite cycle/)).toBeNull()
+  })
+
+  it('shows a node outside the tree as such', () => {
+    store.getState().setPlaying(true)
+    const card = renderNode('technology', { title: 'Fire' })
+    expect(card.className).toContain('graph-node--play-outside')
   })
 })

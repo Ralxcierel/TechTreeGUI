@@ -1,22 +1,45 @@
 // The one generic node component. Its look and contents come from the node's type (plus the node's
 // own style overrides), not from code.
-import { Handle, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
-import { useId, useState } from 'react'
+import {
+  Handle,
+  NodeToolbar,
+  Position,
+  useStore,
+  useUpdateNodeInternals,
+  type NodeProps,
+} from '@xyflow/react'
+import { useEffect, useId, useState } from 'react'
 import { cardLines, EMPTY, expandedLines, tooltipLines } from '../../editor/cardDisplay'
-import { useEditorStore } from '../../editor/store'
-import { SIDE_HANDLE_IDS, type FlowNode } from '../../editor/flowAdapter'
-import { knownShape, resolveNodeStyle } from '../../model'
+import {
+  selectCycleNodeIds,
+  selectPlayStates,
+  selectSearchMatchSet,
+  useEditorStore,
+} from '../../editor/store'
+import { sideHandleIds, type FlowNode } from '../../editor/flowAdapter'
+import { knownShape, resolveNodeStyle, type PlayState } from '../../model'
 import { cardIcon } from '../../editor/images'
+import { outlineForShape } from '../../editor/floatingEdge'
 import { CardEnumSelect } from './CardEnumSelect'
 import { CardExpanded } from './CardExpanded'
 import { CardIconView } from './CardIconView'
 import { CardImage } from './CardImage'
 import { CardTooltip } from './CardTooltip'
 import { EditableText } from './EditableText'
+import { NamedHandle } from './NamedHandle'
 import { useHoverIntent } from './useHoverIntent'
 
 /** How long the pointer must rest on a node before its tooltip shows (decision D2 of Phase 3). */
 export const TOOLTIP_DELAY_MS = 400
+
+/** What a screen reader hears for each play state (the card shows it with colour and a mark). */
+const PLAY_STATE_TEXT: Record<PlayState, string> = {
+  outside: 'Not part of the tech tree. ',
+  blocked: 'Blocked: can never be unlocked. ',
+  locked: 'Locked. ',
+  available: 'Available: click or press Enter to unlock. ',
+  unlocked: 'Unlocked: click or press Enter to lock again. ',
+}
 
 const SIDE_POSITION: Record<string, Position> = {
   top: Position.Top,
@@ -28,9 +51,21 @@ const SIDE_POSITION: Record<string, Position> = {
 export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const nodeType = useEditorStore((s) => s.doc.nodeTypes.find((t) => t.id === data.typeId))
   const setNodeField = useEditorStore((s) => s.setNodeField)
+  const endUndoGroup = useEditorStore((s) => s.endUndoGroup)
   const removeNodeField = useEditorStore((s) => s.removeNodeField)
   const expanded = useEditorStore((s) => s.expandedNodeIds.has(id))
   const toggleExpanded = useEditorStore((s) => s.toggleExpanded)
+  const inCycle = useEditorStore((s) => selectCycleNodeIds(s).has(id))
+  // In play mode (D7) the node's state; null while editing.
+  const playState = useEditorStore((s) =>
+    s.playing ? (selectPlayStates(s).get(id) ?? 'outside') : null,
+  )
+  const readOnly = playState !== null
+  // With a search active (D6 of Phase 5): whether this node matches; null without a search.
+  const searchMatch = useEditorStore((s) => {
+    const matches = selectSearchMatchSet(s)
+    return matches === null ? null : matches.has(id)
+  })
   const hover = useHoverIntent(TOOLTIP_DELAY_MS)
   const tooltipId = useId()
   // A boolean read straight from React Flow's store, so nodes only re-render when a connection
@@ -38,6 +73,17 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   const connecting = useStore((s) => s.connection.inProgress)
   // True while a text line on the card is being edited.
   const [editing, setEditing] = useState(false)
+  // React Flow measures where a node's handles are only when the node resizes. When the type's
+  // named handles (or the shape, which moves them onto a circle) change, ask it to measure again,
+  // or edges would stay attached to the old positions.
+  const updateNodeInternals = useUpdateNodeInternals()
+  const shapeKey = nodeType
+    ? knownShape(resolveNodeStyle(nodeType.style, data.overrides).shape)
+    : ''
+  const handlesKey = JSON.stringify([nodeType?.handles ?? [], shapeKey])
+  useEffect(() => {
+    updateNodeInternals(id)
+  }, [id, handlesKey, updateNodeInternals])
   // Pressing on the card (to drag, connect, or edit) hides the tooltip until the pointer leaves
   // and rests on the node again.
   // (pointerdown, not mousedown: React Flow's drag handling stops mousedown before React sees it.)
@@ -49,7 +95,16 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
   if (!nodeType) {
     // Keeps the hover handlers, so a tooltip can't get stuck if the type comes back.
     return (
-      <div className="graph-node graph-node--missing" {...pointer}>
+      <div
+        className={[
+          'graph-node graph-node--missing',
+          // Never a search match: dimmed like the rest while a search is active.
+          searchMatch === false && 'graph-node--dimmed',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        {...pointer}
+      >
         Unknown type
       </div>
     )
@@ -65,7 +120,18 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
 
   return (
     <div
-      className={`graph-node graph-node--${shape}`}
+      className={[
+        'graph-node',
+        `graph-node--${shape}`,
+        // In play mode the play state replaces the cycle mark (a cycle's nodes show as blocked).
+        playState
+          ? `graph-node--play graph-node--play-${playState}`
+          : inCycle && 'graph-node--cycle',
+        searchMatch === true && 'graph-node--match',
+        searchMatch === false && 'graph-node--dimmed',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       {...pointer}
       aria-describedby={tooltipShown ? tooltipId : undefined}
       style={{
@@ -84,17 +150,41 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
           <CardTooltip id={tooltipId} lines={tips} />
         </NodeToolbar>
       )}
+      {/* The type's named handles: always shown, and edges drawn from them stay on them. They come
+          before the side handles: when a dropped connection is equally near both (a named handle in
+          the middle of a side sits exactly on that side's handle), React Flow picks the first. */}
+      {nodeType.handles.map((h) => (
+        <NamedHandle key={h.id} handle={h} outline={outlineForShape(shape)} />
+      ))}
       {/* Connection points on every side. In the canvas's "loose" mode any of them can start or
           finish a connection; edges then float to whichever side faces the other node. */}
-      {SIDE_HANDLE_IDS.map((side) => (
+      {/* (Not where a named handle sits in the middle of that side: see sideHandleIds.) */}
+      {sideHandleIds(nodeType.handles).map((side) => (
         <Handle key={side} id={side} type="source" position={SIDE_POSITION[side]!} />
       ))}
+      {/* Outside the body, which clips its content on circles. */}
+      {playState === 'unlocked' && (
+        <span className="graph-node__unlocked" aria-hidden="true">
+          ✓
+        </span>
+      )}
       <div className="graph-node__body">
+        {playState ? (
+          <span className="visually-hidden">{PLAY_STATE_TEXT[playState]}</span>
+        ) : (
+          inCycle && <span className="visually-hidden">In a prerequisite cycle. </span>
+        )}
+        {searchMatch === true && <span className="visually-hidden">Matches the search. </span>}
         {icon && <CardIconView icon={icon} />}
         {lines.map((line) => {
-          const commit = (value: string) => setNodeField(id, line.key, value)
+          // An edit on the card is one undo step of its own. (Enter removes the focused box, and
+          // some browsers send no focusout for that, so the step is ended here.)
+          const commit = (value: string) => {
+            setNodeField(id, line.key, value)
+            endUndoGroup()
+          }
           if (line.title) {
-            return line.editable ? (
+            return line.editable && !readOnly ? (
               <EditableText
                 key={line.key}
                 className="graph-node__title"
@@ -115,7 +205,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
               <span className="graph-node__label">{line.label}: </span>
               {line.imageUrl ? (
                 <CardImage className="graph-node__image" src={line.imageUrl} alt={line.label} />
-              ) : line.choices ? (
+              ) : line.choices && !readOnly ? (
                 <CardEnumSelect
                   label={line.label}
                   choices={line.choices}
@@ -124,7 +214,7 @@ export function GraphNode({ id, data, dragging }: NodeProps<FlowNode>) {
                     v === undefined ? removeNodeField(id, line.key) : setNodeField(id, line.key, v)
                   }
                 />
-              ) : line.editable ? (
+              ) : line.editable && !readOnly ? (
                 <EditableText
                   className="graph-node__value"
                   label={line.label}

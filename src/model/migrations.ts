@@ -16,9 +16,36 @@ function v1ToV2(doc: RawDocument): RawDocument {
   return { ...doc, edgeTypes, schemaVersion: 2 }
 }
 
+/** v2 → v3: node types gain `handles` (named connection points); existing types have none. */
+function v2ToV3(doc: RawDocument): RawDocument {
+  if (!Array.isArray(doc.nodeTypes)) return { ...doc, schemaVersion: 3 }
+  const nodeTypes = doc.nodeTypes.map((t: unknown) =>
+    !isPlainObject(t) || 'handles' in t ? t : { ...t, handles: [] },
+  )
+  return { ...doc, nodeTypes, schemaVersion: 3 }
+}
+
+/**
+ * v3 → v4: documents gain `layout` (direction, spacing, tiers; decision D5 of Phase 4) with the
+ * defaults. Nodes need nothing: a missing `tierId` loads as "no tier".
+ */
+function v3ToV4(doc: RawDocument): RawDocument {
+  if ('layout' in doc) return { ...doc, schemaVersion: 4 }
+  return { ...doc, layout: { direction: 'down', spacing: 250, tiers: [] }, schemaVersion: 4 }
+}
+
+/** v4 → v5: documents gain `frames` (decision D7 of Phase 5), none to start with. */
+function v4ToV5(doc: RawDocument): RawDocument {
+  if ('frames' in doc) return { ...doc, schemaVersion: 5 }
+  return { ...doc, frames: [], schemaVersion: 5 }
+}
+
 /** Keyed by the version a migration upgrades *from*. */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: v1ToV2,
+  2: v2ToV3,
+  3: v3ToV4,
+  4: v4ToV5,
 }
 
 export type MigrateResult = { ok: true; doc: RawDocument } | { ok: false; error: string }

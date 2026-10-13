@@ -2,6 +2,7 @@
 // data its type doesn't define. Built from the node's type, like the card.
 import { useEditorStore } from '../../editor/store'
 import { FieldEditor } from './fields/FieldEditor'
+import { NodeTierSelect } from './NodeTierSelect'
 import { OtherData } from './OtherData'
 import { StyleOverrides } from './StyleOverrides'
 
@@ -26,6 +27,7 @@ export function NodeInspector({ nodeId }: NodeInspectorProps) {
   return (
     <>
       <h2 className="inspector__heading">{nodeType.name}</h2>
+      <NodeTierSelect nodeId={node.id} tierId={node.tierId} />
       <section aria-label="Fields">
         {nodeType.fields.map((field) => (
           <FieldEditor

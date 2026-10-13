@@ -79,3 +79,71 @@ describe('v1 → v2', () => {
     expect(v1ToV2({ schemaVersion: 1 })).toEqual({ schemaVersion: 2 })
   })
 })
+
+describe('v2 → v3', () => {
+  const v2ToV3 = MIGRATIONS[2]!
+
+  it('gives every node type an empty handle list, keeping everything else', () => {
+    const input = {
+      schemaVersion: 2,
+      extra: 'kept',
+      nodeTypes: [{ id: 'tech', fields: [] }],
+    }
+    expect(v2ToV3(input)).toEqual({
+      schemaVersion: 3,
+      extra: 'kept',
+      nodeTypes: [{ id: 'tech', fields: [], handles: [] }],
+    })
+    expect(input.schemaVersion).toBe(2)
+    expect('handles' in input.nodeTypes[0]!).toBe(false)
+  })
+
+  it('keeps existing handles and tolerates malformed entries', () => {
+    const out = v2ToV3({ schemaVersion: 2, nodeTypes: [{ id: 'a', handles: ['x'] }, 'junk'] })
+    expect(out.nodeTypes).toEqual([{ id: 'a', handles: ['x'] }, 'junk'])
+  })
+
+  it('tolerates a missing nodeTypes array (the validator reports it later)', () => {
+    expect(v2ToV3({ schemaVersion: 2 })).toEqual({ schemaVersion: 3 })
+  })
+})
+
+describe('v3 → v4', () => {
+  const v3ToV4 = MIGRATIONS[3]!
+
+  it('adds the default layout settings, keeping everything else', () => {
+    const input = { schemaVersion: 3, extra: 'kept', nodes: [{ id: 'a' }] }
+    expect(v3ToV4(input)).toEqual({
+      schemaVersion: 4,
+      extra: 'kept',
+      nodes: [{ id: 'a' }],
+      layout: { direction: 'down', spacing: 250, tiers: [] },
+    })
+    expect(input.schemaVersion).toBe(3)
+    expect('layout' in input).toBe(false)
+  })
+
+  it('keeps a layout that is already there (the validator checks it)', () => {
+    expect(v3ToV4({ schemaVersion: 3, layout: 'odd' })).toEqual({ schemaVersion: 4, layout: 'odd' })
+  })
+})
+
+describe('v4 → v5', () => {
+  const v4ToV5 = MIGRATIONS[4]!
+
+  it('adds an empty frame list, keeping everything else', () => {
+    const input = { schemaVersion: 4, extra: 'kept', nodes: [{ id: 'a' }] }
+    expect(v4ToV5(input)).toEqual({
+      schemaVersion: 5,
+      extra: 'kept',
+      nodes: [{ id: 'a' }],
+      frames: [],
+    })
+    expect(input.schemaVersion).toBe(4)
+    expect('frames' in input).toBe(false)
+  })
+
+  it('keeps frames that are already there (the validator checks them)', () => {
+    expect(v4ToV5({ schemaVersion: 4, frames: 'odd' })).toEqual({ schemaVersion: 5, frames: 'odd' })
+  })
+})

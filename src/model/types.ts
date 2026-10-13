@@ -1,7 +1,7 @@
-// Graph document schema, version 2. See docs/PLAN.md §1.
+// Graph document schema, version 5. See docs/PLAN.md §1.
 // Pure data types: no React or UI imports anywhere in src/model/.
 
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 5
 
 export type FieldKind = 'text' | 'number' | 'enum' | 'boolean' | 'list' | 'richtext' | 'image'
 export type FieldPlacement = 'card' | 'tooltip' | 'expanded'
@@ -23,11 +23,34 @@ export interface NodeStyle {
   icon: string | null
 }
 
+/** A side of a node's box. */
+export type HandleSide = 'top' | 'right' | 'bottom' | 'left'
+
+/** Every side, in this order. Also the ids of the generic side handles, which named handles can't use. */
+export const HANDLE_SIDES: readonly HandleSide[] = ['top', 'right', 'bottom', 'left']
+
+/** Which way edges may use a named handle: "out" starts edges, "in" ends them, "both" does either. */
+export type HandleDirection = 'in' | 'out' | 'both'
+
+export const HANDLE_DIRECTIONS: readonly HandleDirection[] = ['in', 'out', 'both']
+
+/** A named connection point of a node type (added in schema v3, decision D5 of Phase 3). */
+export interface HandleDef {
+  /** Unique within the type, and never one of the generic side ids top/right/bottom/left. */
+  id: string
+  label: string
+  side: HandleSide
+  /** Where along the side, from 0 (top or left end) to 1 (bottom or right end). */
+  offset: number
+  direction: HandleDirection
+}
+
 export interface NodeType {
   id: string
   name: string
   style: NodeStyle
   fields: FieldDef[]
+  handles: HandleDef[]
 }
 
 /** Line shape of an edge (added in schema v2). */
@@ -59,6 +82,11 @@ export interface GraphNode {
   position: Position
   data: Record<string, unknown>
   styleOverrides: Partial<NodeStyle>
+  /**
+   * The tier (era) the node belongs to, or null (schema v4, decision D5 of Phase 4). An id that
+   * names no tier is kept, and treated as no tier.
+   */
+  tierId: string | null
 }
 
 export interface GraphEdge {
@@ -76,6 +104,47 @@ export interface Viewport {
   zoom: number
 }
 
+/** Which way a tech tree grows (schema v4): linear directions, or rings around a centre. */
+export type LayoutDirection = 'down' | 'up' | 'left' | 'right' | 'radial'
+
+export const LAYOUT_DIRECTIONS: readonly LayoutDirection[] = [
+  'down',
+  'up',
+  'left',
+  'right',
+  'radial',
+]
+
+/** A tier (era): a lane in linear layouts, a ring in radial ones. Its id never changes. */
+export interface Tier {
+  id: string
+  name: string
+}
+
+/** The document's layout settings (schema v4, decision D5 of Phase 4). */
+export interface LayoutSettings {
+  direction: LayoutDirection
+  /** Distance between layers, lanes or rings, in flow units (positive). */
+  spacing: number
+  /** In lane / ring order. */
+  tiers: Tier[]
+}
+
+/**
+ * A titled, coloured rectangle drawn behind a group of nodes (schema v5, decision D7 of Phase 5).
+ * Nodes don't belong to a frame in the data: being inside one is purely geometric (D8).
+ */
+export interface Frame {
+  id: string
+  title: string
+  note: string
+  /** CSS colour of the border and (faded) fill. */
+  color: string
+  /** Top-left corner, in flow units. */
+  position: Position
+  size: { width: number; height: number }
+}
+
 export interface DocumentMeta {
   name: string
   created: string
@@ -89,5 +158,7 @@ export interface GraphDocument {
   edgeTypes: EdgeType[]
   nodes: GraphNode[]
   edges: GraphEdge[]
+  frames: Frame[]
+  layout: LayoutSettings
   view: { viewport: Viewport }
 }

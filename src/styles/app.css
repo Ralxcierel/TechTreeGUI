@@ -6,6 +6,8 @@
   --text-muted: #94a3b8;
   --accent: #38bdf8;
   --error: #f87171;
+  --warning: #fbbf24;
+  --search-match: #a78bfa;
   --radius: 8px;
 
   color-scheme: dark;
@@ -64,6 +66,23 @@ body,
   border-color: var(--accent);
 }
 
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--panel-border);
+}
+
+/* Play mode (Phase 4): the toggle sits apart from the file buttons. */
+.toolbar .toolbar__play {
+  margin-left: 12px;
+  border-color: var(--accent);
+}
+
+.toolbar__play-status {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .error-banner {
   display: flex;
   align-items: flex-start;
@@ -95,6 +114,21 @@ body,
   background: transparent;
   border: none;
   cursor: pointer;
+}
+
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--warning) 18%, var(--panel));
+  border-bottom: 1px solid var(--warning);
+}
+
+.recovery-banner__text {
+  flex: 1;
+  min-width: 0;
 }
 
 .workspace {
@@ -197,6 +231,26 @@ body,
   opacity: 1;
 }
 
+/* A type's named handles are always shown: they are part of the card's design. Filled = edges
+   start here ("out"), hollow = edges end here ("in"), half filled = both. */
+.react-flow__node .react-flow__handle.graph-node__handle {
+  opacity: 1;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  background: var(--accent);
+  /* Above a side handle in the same spot, so pointing at the dot finds the named handle. */
+  z-index: 1;
+}
+
+.react-flow__node .react-flow__handle.graph-node__handle--in {
+  background: var(--bg);
+}
+
+.react-flow__node .react-flow__handle.graph-node__handle--both {
+  background: linear-gradient(90deg, var(--accent) 50%, var(--bg) 50%);
+}
+
 /* Selected nodes get an accent outline, so it is clear what the inspector is showing. */
 .react-flow__node.selected .graph-node {
   box-shadow: 0 0 0 2px var(--accent);
@@ -237,6 +291,35 @@ body,
 
 .graph-node--circle .graph-node__line {
   margin-top: 2px;
+}
+
+/* Nodes in a prerequisite cycle (Phase 4): a dashed warning outline just outside the card, so
+   it shows next to the selection outline and follows the card's shape. */
+.graph-node--cycle {
+  outline: 2px dashed var(--warning);
+  outline-offset: 4px;
+}
+
+/* Search (D6 of Phase 5): matches get a violet ring (a box-shadow, so it follows the card's shape
+   and shows with the cycle and play outlines); the rest is dimmed. The dimming is on React Flow's
+   node wrapper, so it multiplies with the play-mode opacity on the card instead of replacing it
+   (and, unlike a `filter` on the card, doesn't move the card's handles). */
+.graph-node--match {
+  box-shadow: 0 0 0 3px var(--search-match);
+}
+
+.react-flow__node.selected .graph-node--match {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px var(--search-match);
+}
+
+.react-flow__node:has(> .graph-node--dimmed) {
+  opacity: 0.3;
+}
+
+.react-flow__edge.graph-edge--dimmed {
+  opacity: 0.2;
 }
 
 .graph-node--missing {
@@ -534,7 +617,8 @@ body,
   cursor: not-allowed;
 }
 
-.library__section + .library__section {
+.library__section + .library__section,
+.plain-fieldset + .library__section {
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid var(--panel-border);
@@ -749,4 +833,430 @@ body,
 .card-expanded__toggle,
 .card-expanded {
   clear: left;
+}
+
+/* The Problems panel, below the Library (Phase 4). */
+.problems__summary {
+  cursor: pointer;
+  list-style-position: outside;
+  margin-left: 14px;
+}
+
+.problems__heading {
+  display: inline;
+}
+
+.problems__count {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.problems__list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problems__item {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.problems__item:hover {
+  background: var(--panel-border);
+}
+
+.problems__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A fieldset used only to disable everything inside it (play mode), drawn as nothing. */
+.plain-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Play mode (Phase 4, D7): node states. Handles are hidden: nothing can be connected. */
+.canvas--play .react-flow__handle {
+  visibility: hidden;
+}
+
+/* Only nodes a click changes get the hand cursor (React Flow gives every selectable node one). */
+.canvas--play .react-flow__node {
+  cursor: default;
+}
+
+.canvas--play .react-flow__node:has(.graph-node--play-available, .graph-node--play-unlocked) {
+  cursor: pointer;
+}
+
+.graph-node--play {
+  transition: opacity 0.15s;
+}
+
+.graph-node--play-outside {
+  opacity: 0.25;
+}
+
+.graph-node--play-locked {
+  opacity: 0.45;
+}
+
+.graph-node--play-available {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.graph-node--play-unlocked {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  box-shadow: inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.react-flow__node.selected .graph-node--play-unlocked {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+/* An unlocked card that matches the search keeps both its tint and the search ring. */
+.graph-node--play-unlocked.graph-node--match {
+  box-shadow:
+    0 0 0 3px var(--search-match),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.react-flow__node.selected .graph-node--play-unlocked.graph-node--match {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 5px var(--search-match),
+    inset 0 0 0 999px rgb(56 189 248 / 0.18);
+}
+
+.graph-node--play-blocked {
+  outline: 2px dashed var(--error);
+  outline-offset: 4px;
+  opacity: 0.6;
+}
+
+/* The check mark on an unlocked card, at its top-right corner (placed against React Flow's node
+   wrapper, which is positioned and the same size as the card). */
+.graph-node__unlocked {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+}
+
+/* On a circle, the top-right corner of the box is far from the outline: sit on the outline at
+   45 degrees instead (14.6% in from each side). */
+.graph-node--circle .graph-node__unlocked {
+  top: calc(14.6% - 11px);
+  right: calc(14.6% - 11px);
+}
+
+/* Layout settings in the Document inspector (Phase 4): the tier list. */
+.inspector__minor-heading {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tier-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.tier-list__number {
+  min-width: 1.5em;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tier-list__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tier-list__name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.tier-list__name:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.tier-list__count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tier-list .inspector__link:disabled {
+  color: var(--text-muted);
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Tier lanes (Phase 4, D9): bands behind the nodes, above the dotted background. z-index 0 keeps
+   them under React Flow's renderer (z-index 4), so they never catch clicks or drags. */
+.tier-lanes {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tier-lanes__lane {
+  position: absolute;
+  overflow: hidden;
+  border-color: rgb(148 163 184 / 0.35);
+  border-style: dashed;
+  border-width: 0;
+}
+
+.tier-lanes__lane--y {
+  border-top-width: 1px;
+}
+
+.tier-lanes__lane--y.tier-lanes__lane--last {
+  border-bottom-width: 1px;
+}
+
+.tier-lanes__lane--x {
+  border-left-width: 1px;
+}
+
+.tier-lanes__lane--x.tier-lanes__lane--last {
+  border-right-width: 1px;
+}
+
+.tier-lanes__lane--even {
+  background: rgb(56 189 248 / 0.05);
+}
+
+.tier-lanes__lane--odd {
+  background: rgb(148 163 184 / 0.07);
+}
+
+/* The name sits at the canvas edge: left for horizontal bands, top for vertical ones (the band
+   spans the whole canvas that way); along the lane it is placed inline by TierLanes. */
+.tier-lanes__name {
+  position: absolute;
+  max-width: calc(100% - 28px); /* horizontal bands; vertical ones set it inline */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 6px 8px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--panel);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Radial mode: the tiers as rings around the flow origin (TierRings). */
+.tier-rings {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tier-rings__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tier-rings__band {
+  fill: none;
+}
+
+.tier-rings__band--even {
+  stroke: rgb(56 189 248 / 0.05);
+}
+
+.tier-rings__band--odd {
+  stroke: rgb(148 163 184 / 0.07);
+}
+
+.tier-rings__boundary {
+  fill: none;
+  stroke: rgb(148 163 184 / 0.35);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+
+/* At the top (outer edge) of its band, centred above the origin. */
+.tier-rings__name {
+  position: absolute;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--panel);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* The keyboard sign in the canvas controls: hover text only, not a button. */
+.react-flow__controls-button.shortcut-hint {
+  cursor: help;
+  font-size: 14px;
+}
+
+/* The node search at the top of the Library (D6 of Phase 5). */
+.search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.search-box__query,
+.search-box__field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.search-box__count {
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Frames (schema v5, D7 and D8 of Phase 5): a tinted rectangle behind the cards. The wrapper and
+   the body let the pointer through (pan, box-select and click cards inside); only the title strip
+   (drag, select) and the resize handles take it. */
+/* `!important`: React Flow puts an inline `pointer-events: all` on every selectable node. */
+.react-flow__node.react-flow__node-frame {
+  pointer-events: none !important;
+}
+
+.frame-node {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--frame-color, var(--accent));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--frame-color, var(--accent)) 8%, transparent);
+}
+
+.react-flow__node-frame.selected .frame-node {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.frame-node__header {
+  pointer-events: all;
+  cursor: grab;
+  padding: 6px 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--frame-color, var(--accent)) 22%, transparent);
+  border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
+}
+
+.canvas--play .frame-node__header {
+  cursor: default;
+}
+
+.frame-node__title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frame-node__note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.react-flow__node-frame .react-flow__resize-control {
+  pointer-events: all;
+}
+
+.minimap-frame {
+  opacity: 0.35;
+}
+
+/* A small drop-down menu under a toolbar button (the Export menu, P5-5). */
+.menu {
+  position: relative;
+}
+
+.menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 170px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+
+.menu__list button {
+  display: block;
+  width: 100%;
+  text-align: left;
 }

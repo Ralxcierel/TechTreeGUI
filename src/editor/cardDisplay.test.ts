@@ -41,6 +41,7 @@ describe('cardLines', () => {
     id: 't',
     name: 'T',
     style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    handles: [],
     fields,
   })
 
@@ -95,6 +96,7 @@ describe('tooltipLines', () => {
     id: 't',
     name: 'T',
     style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    handles: [],
     fields,
   })
 
@@ -123,6 +125,7 @@ describe('cardLines: enum dropdowns', () => {
     id: 't',
     name: 'T',
     style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    handles: [],
     fields: [
       { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
       {
@@ -163,6 +166,7 @@ describe('expandedLines', () => {
     id: 't',
     name: 'T',
     style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    handles: [],
     fields: [
       { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
       { key: 'details', label: 'Details', kind: 'richtext', show: ['expanded'] },
@@ -185,6 +189,7 @@ describe('pictures in card, tooltip and expanded lines', () => {
     id: 't',
     name: 'T',
     style: { shape: 'rounded', width: 200, fill: '#000', border: '#fff', icon: null },
+    handles: [],
     fields: [
       { key: 'title', label: 'Name', kind: 'text', show: ['card'] },
       { key: 'art', label: 'Art', kind: 'image', show: ['card', 'tooltip', 'expanded'] },

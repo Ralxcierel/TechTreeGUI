@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { FlowNode } from './flowAdapter'
 import { addNode, createEmptyDocument, DEFAULT_NODE_TYPE_ID } from '../model'
 import { useEditorStore } from './store'
 
@@ -14,7 +15,7 @@ describe('rename, new document and unsaved changes', () => {
     const id = store.getState().doc.nodes[0]!.id
     store.getState().setNodeField(id, 'title', 'Steam Power')
     expect(store.getState().doc.nodes[0]?.data.title).toBe('Steam Power')
-    expect(store.getState().flowNodes[0]?.data.values.title).toBe('Steam Power')
+    expect((store.getState().flowNodes[0] as FlowNode).data.values.title).toBe('Steam Power')
   })
 
   it('tracks unsaved changes across edit, save, load and new', () => {

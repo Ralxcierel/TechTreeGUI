@@ -10,12 +10,16 @@ import {
 } from '../model'
 import {
   emptyUi,
+  anyBoxInView,
   paneCenter,
   reduceEdgeChanges,
   reduceNodeChanges,
+  CYCLE_EDGE_COLOR,
   SELECTED_EDGE_COLOR,
   SIDE_HANDLE_IDS,
   toFlowEdges,
+  handleIdsByNode,
+  sideHandleIds,
   toFlowNodes,
   uiForLoadedDocument,
 } from './flowAdapter'
@@ -80,7 +84,7 @@ describe('toFlowNodes', () => {
     }
     const second = toFlowNodes(restyled, emptyUi(), first)
     expect(second[0]).not.toBe(first[0])
-    expect(second[0]?.data.overrides).toEqual({ fill: '#f00' })
+    expect(second[0]?.type === 'graph' && second[0].data.overrides).toEqual({ fill: '#f00' })
     expect(second[1]).toBe(first[1])
   })
 
@@ -203,6 +207,36 @@ describe('uiForLoadedDocument', () => {
 describe('toFlowEdges', () => {
   const edges = twoNodes().edges
 
+  it('passes on side handle ids and the named handle ids of each end node, nothing else', () => {
+    const doc = twoNodes()
+    const handle = { label: 'X', side: 'left', offset: 0.5, direction: 'both' } as const
+    const nodeTypes = doc.nodeTypes.map((t) =>
+      t.id === doc.nodes[0]!.typeId ? { ...t, handles: [{ ...handle, id: 'x' }] } : t,
+    )
+    // Only node a has the type with handle "x" when b is retyped.
+    const nodes = doc.nodes.map((n) => (n.id === 'b' ? { ...n, typeId: 'other' } : n))
+    const named = handleIdsByNode(nodes, nodeTypes)
+    expect([...named.keys()]).toEqual(['a'])
+    expect([...named.get('a')!]).toEqual(['x', 'top', 'right', 'bottom'])
+    const base = doc.edges[0]!
+    const flow = (sourceHandle: string | null, targetHandle: string | null) => {
+      const [edge] = toFlowEdges([{ ...base, sourceHandle, targetHandle }], [], new Set(), named)
+      return [edge?.sourceHandle, edge?.targetHandle]
+    }
+    expect(flow('x', 'x')).toEqual(['x', null]) // b has no handle "x"
+    expect(flow('top', 'gone')).toEqual(['top', null])
+    expect(flow(null, 'left')).toEqual([null, 'left'])
+    // a's "left" side handle isn't drawn (handle "x" sits on its spot), so that end floats.
+    expect(flow('left', null)).toEqual([null, null])
+  })
+
+  it('leaves out the side handles that a named handle in the middle of the side covers', () => {
+    const h = (side: 'left' | 'top', offset: number) =>
+      ({ id: side, label: '', side, offset, direction: 'both' }) as const
+    expect(sideHandleIds([])).toEqual(['top', 'right', 'bottom', 'left'])
+    expect(sideHandleIds([h('left', 0.5), h('top', 0.25)])).toEqual(['top', 'right', 'bottom'])
+  })
+
   it('styles edges from their type and marks selection', () => {
     const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set(['ab']))
     expect(edge).toEqual({
@@ -223,6 +257,15 @@ describe('toFlowEdges', () => {
     const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set())
     expect(edge?.style?.stroke).toBe('#94a3b8')
     expect(edge?.markerEnd).toEqual({ type: MarkerType.ArrowClosed, color: '#94a3b8' })
+  })
+
+  it('draws edges in a prerequisite cycle in the error colour, unless selected', () => {
+    const cycle = new Set(['ab'])
+    const [edge] = toFlowEdges(edges, [defaultEdgeType()], new Set(), new Map(), cycle)
+    expect(edge?.style?.stroke).toBe(CYCLE_EDGE_COLOR)
+    expect(edge?.markerEnd).toEqual({ type: MarkerType.ArrowClosed, color: CYCLE_EDGE_COLOR })
+    const [selected] = toFlowEdges(edges, [defaultEdgeType()], new Set(['ab']), new Map(), cycle)
+    expect(selected?.style?.stroke).toBe(SELECTED_EDGE_COLOR)
   })
 
   it('maps dash and arrow placement', () => {
@@ -339,5 +382,51 @@ describe('paneCenter', () => {
   it('undoes pan and zoom', () => {
     expect(paneCenter(800, 600, [0, 0, 1])).toEqual({ x: 400, y: 300 })
     expect(paneCenter(800, 600, [100, 50, 2])).toEqual({ x: 150, y: 125 })
+  })
+})
+
+describe('anyBoxInView', () => {
+  const box = (x: number, y: number) => ({
+    position: { x, y },
+    size: { width: 100, height: 50 },
+  })
+  it('is true when any box overlaps the pane, after pan and zoom', () => {
+    expect(anyBoxInView([box(-99, 0)], 800, 600, [0, 0, 1])).toBe(true) // 1 px inside
+    expect(anyBoxInView([box(-100, 0)], 800, 600, [0, 0, 1])).toBe(false) // touching the edge
+    expect(anyBoxInView([box(799, 599)], 800, 600, [0, 0, 1])).toBe(true)
+    expect(anyBoxInView([box(800, 0)], 800, 600, [0, 0, 1])).toBe(false)
+    expect(anyBoxInView([box(1000, 0), box(10, 10)], 800, 600, [0, 0, 1])).toBe(true)
+    // Panned 500 px left at zoom 2: x 300 is on screen at 100.
+    expect(anyBoxInView([box(300, 0)], 800, 600, [-500, 0, 2])).toBe(true)
+    expect(anyBoxInView([box(0, 0)], 800, 600, [-500, 0, 2])).toBe(false)
+    expect(anyBoxInView([box(0, 400)], 800, 600, [0, 0, 2])).toBe(false) // 800 px down
+  })
+  it('is false without boxes or with an empty pane', () => {
+    expect(anyBoxInView([], 800, 600, [0, 0, 1])).toBe(false)
+    expect(anyBoxInView([box(0, 0)], 0, 0, [0, 0, 1])).toBe(false)
+  })
+})
+
+describe('toFlowEdges: search dimming', () => {
+  it('gives dimmed edges a class, but not selected ones', () => {
+    const doc = createEmptyDocument()
+    const edge = (id: string) => ({
+      id,
+      typeId: 'prereq',
+      source: 'a',
+      target: 'b',
+      sourceHandle: null,
+      targetHandle: null,
+    })
+    const flow = toFlowEdges(
+      [edge('e1'), edge('e2'), edge('e3')],
+      doc.edgeTypes,
+      new Set(['e3']), // selected
+      new Map(),
+      new Set(),
+      new Set(['e2', 'e3']),
+    )
+    // A selected edge isn't dimmed, so its selection colour stays visible.
+    expect(flow.map((e) => e.className)).toEqual([undefined, 'graph-edge--dimmed', undefined])
   })
 })

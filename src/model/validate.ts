@@ -5,9 +5,13 @@
 // - Keys the app doesn't know are kept on every object, so they survive a save (S5).
 import { isFiniteNumber, isPlainObject } from './guards'
 import { fieldValueProblem } from './fieldValues'
+import { FRAME_FLOW_PREFIX } from './frames'
 import { connectionError } from './operations'
 import {
   CURRENT_SCHEMA_VERSION,
+  HANDLE_DIRECTIONS,
+  HANDLE_SIDES,
+  LAYOUT_DIRECTIONS,
   type DocumentMeta,
   type EdgePath,
   type EdgeStyle,
@@ -15,11 +19,15 @@ import {
   type FieldDef,
   type FieldKind,
   type FieldPlacement,
+  type Frame,
   type GraphDocument,
   type GraphEdge,
   type GraphNode,
+  type HandleDef,
+  type LayoutSettings,
   type NodeStyle,
   type NodeType,
+  type Tier,
   type Viewport,
 } from './types'
 
@@ -251,6 +259,33 @@ function readStyleOverrides(r: Reader, o: Obj, path: string): Partial<NodeStyle>
   return r.errors.length === before ? { ...o } : undefined
 }
 
+/** A named handle (schema v3). `offset` is optional and defaults to the middle of the side. */
+function readHandle(r: Reader, value: unknown, path: string): HandleDef | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  let id = r.id(o, 'id', path)
+  if (id !== undefined && (HANDLE_SIDES as readonly string[]).includes(id)) {
+    id = r.fail(`${path}.id`, `must not be ${list(HANDLE_SIDES)} (those are the side handles).`)
+  }
+  const label = r.string(o, 'label', path)
+  const side = r.oneOf(o, 'side', path, HANDLE_SIDES)
+  let offset = o.offset === undefined ? 0.5 : r.number(o, 'offset', path)
+  if (offset !== undefined && (offset < 0 || offset > 1)) {
+    offset = r.fail(`${path}.offset`, 'must be between 0 and 1.')
+  }
+  const direction = r.oneOf(o, 'direction', path, HANDLE_DIRECTIONS)
+  if (
+    id === undefined ||
+    label === undefined ||
+    side === undefined ||
+    offset === undefined ||
+    direction === undefined
+  ) {
+    return undefined
+  }
+  return { ...o, id, label, side, offset, direction }
+}
+
 function readNodeType(r: Reader, value: unknown, path: string): NodeType | undefined {
   const o = r.object(value, path)
   if (!o) return undefined
@@ -264,8 +299,15 @@ function readNodeType(r: Reader, value: unknown, path: string): NodeType | undef
       `${path}.fields`,
       'key',
     )
-  if (id === undefined || name === undefined || !style || !fields) return undefined
-  return { ...o, id, name, style, fields }
+  const handles = r.items(o.handles, `${path}.handles`, (h, p) => readHandle(r, h, p))
+  if (handles)
+    r.unique(
+      handles.map((h) => h.id),
+      `${path}.handles`,
+      'id',
+    )
+  if (id === undefined || name === undefined || !style || !fields || !handles) return undefined
+  return { ...o, id, name, style, fields, handles }
 }
 
 function readEdgeStyle(r: Reader, value: unknown, path: string): EdgeStyle | undefined {
@@ -302,7 +344,10 @@ function readEdgeType(r: Reader, value: unknown, path: string): EdgeType | undef
 function readNode(r: Reader, value: unknown, path: string): GraphNode | undefined {
   const o = r.object(value, path)
   if (!o) return undefined
-  const id = r.id(o, 'id', path)
+  let id = r.id(o, 'id', path)
+  if (id?.startsWith(FRAME_FLOW_PREFIX)) {
+    id = r.fail(`${path}.id`, `must not start with "${FRAME_FLOW_PREFIX}" (reserved for frames).`)
+  }
   const typeId = r.id(o, 'typeId', path)
   const pos = r.object(o.position, `${path}.position`)
   const x = pos && r.number(pos, 'x', `${path}.position`)
@@ -311,7 +356,9 @@ function readNode(r: Reader, value: unknown, path: string): GraphNode | undefine
   const overridesObj = r.optionalObject(o, 'styleOverrides', path)
   const styleOverrides =
     overridesObj && readStyleOverrides(r, overridesObj, `${path}.styleOverrides`)
+  const tierId = r.nullableString(o, 'tierId', path)
   if (
+    tierId === undefined ||
     id === undefined ||
     typeId === undefined ||
     x === undefined ||
@@ -321,7 +368,7 @@ function readNode(r: Reader, value: unknown, path: string): GraphNode | undefine
   ) {
     return undefined
   }
-  return { ...o, id, typeId, position: { ...pos, x, y }, data, styleOverrides }
+  return { ...o, id, typeId, position: { ...pos, x, y }, data, styleOverrides, tierId }
 }
 
 function readEdge(r: Reader, value: unknown, path: string): GraphEdge | undefined {
@@ -344,6 +391,63 @@ function readEdge(r: Reader, value: unknown, path: string): GraphEdge | undefine
     return undefined
   }
   return { ...o, id, typeId, source, target, sourceHandle, targetHandle }
+}
+
+function readTier(r: Reader, value: unknown, path: string): Tier | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  const id = r.id(o, 'id', path)
+  const name = r.string(o, 'name', path)
+  if (id === undefined || name === undefined) return undefined
+  return { ...o, id, name }
+}
+
+function readLayout(r: Reader, value: unknown): LayoutSettings | undefined {
+  const o = r.object(value, 'layout')
+  if (!o) return undefined
+  const direction = r.oneOf(o, 'direction', 'layout', LAYOUT_DIRECTIONS)
+  const spacing = r.positive(o, 'spacing', 'layout')
+  const tiers = r.items(o.tiers, 'layout.tiers', (v, p) => readTier(r, v, p))
+  if (direction === undefined || spacing === undefined || !tiers) return undefined
+  return { ...o, direction, spacing, tiers }
+}
+
+function readFrame(r: Reader, value: unknown, path: string): Frame | undefined {
+  const o = r.object(value, path)
+  if (!o) return undefined
+  const id = r.id(o, 'id', path)
+  const title = r.string(o, 'title', path)
+  const note = r.string(o, 'note', path)
+  const color = r.string(o, 'color', path)
+  const pos = r.object(o.position, `${path}.position`)
+  const x = pos && r.number(pos, 'x', `${path}.position`)
+  const y = pos && r.number(pos, 'y', `${path}.position`)
+  const size = r.object(o.size, `${path}.size`)
+  const width = size && r.positive(size, 'width', `${path}.size`)
+  const height = size && r.positive(size, 'height', `${path}.size`)
+  if (
+    id === undefined ||
+    title === undefined ||
+    note === undefined ||
+    color === undefined ||
+    !pos ||
+    x === undefined ||
+    y === undefined ||
+    !size ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return undefined
+  }
+  return {
+    ...o,
+    id,
+    title,
+    note,
+    color,
+    position: { ...pos, x, y },
+    size: { ...size, width, height },
+  }
 }
 
 function readView(r: Reader, value: unknown): GraphDocument['view'] | undefined {
@@ -381,6 +485,16 @@ function checkIntegrity(r: Reader, doc: GraphDocument): void {
     'edges',
     'id',
   )
+  r.unique(
+    doc.frames.map((f) => f.id),
+    'frames',
+    'id',
+  )
+  r.unique(
+    doc.layout.tiers.map((t) => t.id),
+    'layout.tiers',
+    'id',
+  )
 
   const nodeTypeIds = new Set(doc.nodeTypes.map((t) => t.id))
   doc.nodes.forEach((n, i) => {
@@ -389,7 +503,8 @@ function checkIntegrity(r: Reader, doc: GraphDocument): void {
   })
 
   // Re-add edges one by one with the same rule the editor uses, so a file can't hold an edge the
-  // editor would refuse (self-loop, duplicate, dangling end, unknown type).
+  // editor would refuse (self-loop, duplicate, dangling end, unknown type, a named handle used
+  // against its direction). A handle id the node's type doesn't have is allowed: that end floats.
   const accepted: GraphEdge[] = []
   const built: GraphDocument = { ...doc, edges: accepted }
   doc.edges.forEach((e, i) => {
@@ -414,9 +529,21 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
   const edgeTypes = r.items(raw.edgeTypes, 'edgeTypes', (v, p) => readEdgeType(r, v, p))
   const nodes = r.items(raw.nodes, 'nodes', (v, p) => readNode(r, v, p))
   const edges = r.items(raw.edges, 'edges', (v, p) => readEdge(r, v, p))
+  const frames = r.items(raw.frames, 'frames', (v, p) => readFrame(r, v, p))
+  const layout = readLayout(r, raw.layout)
   const view = readView(r, raw.view)
 
-  if (r.errors.length > 0 || !meta || !nodeTypes || !edgeTypes || !nodes || !edges || !view) {
+  if (
+    r.errors.length > 0 ||
+    !meta ||
+    !nodeTypes ||
+    !edgeTypes ||
+    !nodes ||
+    !edges ||
+    !frames ||
+    !layout ||
+    !view
+  ) {
     return { ok: false, errors: r.errors }
   }
 
@@ -428,6 +555,8 @@ export function validateDocument(raw: Obj, now: Date = new Date()): ValidateResu
     edgeTypes,
     nodes,
     edges,
+    frames,
+    layout,
     view,
   }
   checkIntegrity(r, doc)

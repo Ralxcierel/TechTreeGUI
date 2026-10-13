@@ -1,18 +1,7 @@
 // Shown when exactly one edge is selected: where it goes, and its edge type.
 import { useId, useState } from 'react'
-import { cardLines } from '../../editor/cardDisplay'
+import { nodeName } from '../../editor/cardDisplay'
 import { useEditorStore } from '../../editor/store'
-import type { GraphDocument } from '../../model'
-
-/** A readable name for a node: its card title, else its type name. */
-function nodeName(doc: GraphDocument, nodeId: string): string {
-  const node = doc.nodes.find((n) => n.id === nodeId)
-  if (!node) return nodeId
-  const type = doc.nodeTypes.find((t) => t.id === node.typeId)
-  if (!type) return nodeId
-  const title = cardLines(type, node.data).find((l) => l.title)
-  return title && title.text !== '—' ? title.text : type.name
-}
 
 interface EdgeInspectorProps {
   edgeId: string

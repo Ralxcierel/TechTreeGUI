@@ -114,7 +114,7 @@ describe('setEdgeType', () => {
     if (!both.ok) throw new Error(both.error)
     expect(setEdgeType(both.doc, 'e1', 'unlocks')).toEqual({
       ok: false,
-      error: 'These nodes are already connected by this edge type.',
+      error: 'These nodes are already connected this way (same edge type and handles).',
     })
   })
 })

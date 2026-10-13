@@ -39,6 +39,7 @@ export function EdgeTypeInspector({ typeId }: EdgeTypeInspectorProps) {
     arrow: useId(),
     path: useId(),
     why: useId(),
+    meaning: useId(),
   }
 
   if (!type) return null
@@ -65,9 +66,14 @@ export function EdgeTypeInspector({ typeId }: EdgeTypeInspectorProps) {
       <LabeledInput
         label="Meaning (optional)"
         placeholder="e.g. prerequisite"
+        describedBy={ids.meaning}
         value={type.semantics ?? ''}
         onChange={(v) => update(typeId, { semantics: v.trim() === '' ? null : v.trim() })}
       />
+      <p className="inspector__note" id={ids.meaning}>
+        "prerequisite" makes these edges count for the tech-tree checks: the source must be unlocked
+        before the target.
+      </p>
 
       <h3 className="inspector__subheading">Look</h3>
       <div className="inspector__row">

@@ -74,4 +74,12 @@ describe('GraphNode: enum dropdown on the card', () => {
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.getByText('Magic')).toBeTruthy()
   })
+
+  it('shows the value as text in play mode', () => {
+    s().setNodeField(s().doc.nodes[0]!.id, 'branch', 'Science')
+    s().setPlaying(true)
+    renderNode()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.getByText('Science')).toBeTruthy()
+  })
 })
